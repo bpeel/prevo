@@ -18,6 +18,11 @@ pdb_revo_parse_xml (PdbRevo *revo,
                     const char *filename,
                     GError **error);
 
+char **
+pdb_revo_list_files (PdbRevo *revo,
+                     const char *glob,
+                     GError **error);
+
 void
 pdb_revo_free (PdbRevo *revo);
 
