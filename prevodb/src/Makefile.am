@@ -14,6 +14,8 @@ prevodb_SOURCES = \
 	pdb-revo.h \
 	pdb-strcmp.c \
 	pdb-strcmp.h \
+	pdb-trie.c \
+	pdb-trie.h \
 	pdb-xml.c \
 	pdb-xml.h \
 	$(NULL)
