@@ -95,7 +95,7 @@ pdb_revo_execute_command (PdbRevo *revo,
           nfds++;
         }
 
-      if ((nfds = g_poll (fds, nfds, -1)) == -1)
+      if (g_poll (fds, nfds, -1) == -1)
         {
           g_set_error (error,
                        G_FILE_ERROR,
