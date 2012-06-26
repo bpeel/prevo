@@ -7,11 +7,13 @@
 #include "pdb-error.h"
 #include "pdb-xml.h"
 #include "pdb-strcmp.h"
+#include "pdb-trie.h"
 
 typedef struct
 {
   char *name;
   char *code;
+  PdbTrieBuilder *trie;
 } PdbLangEntry;
 
 struct _PdbLang
@@ -21,6 +23,7 @@ struct _PdbLang
   GError *error;
 
   GArray *languages;
+  GHashTable *hash_table;
 
   GString *name_buf;
   GString *code_buf;
@@ -73,6 +76,7 @@ pdb_lang_end_element_cb (void *user_data,
                           lang->languages->len - 1);
   entry->name = g_strdup (lang->name_buf->str);
   entry->code = g_strdup (lang->code_buf->str);
+  entry->trie = pdb_trie_builder_new ();
 }
 
 static int
@@ -96,6 +100,23 @@ pdb_lang_character_data_cb (void *user_data,
     g_string_append_len (lang->name_buf, s, len);
 }
 
+static void
+pdb_lang_init_hash_table (PdbLang *lang)
+{
+  int i;
+
+  /* This intialises the hash table with the entries found in the list
+   * of languages. The key is the language code and the value is the
+   * language entry node. The key is owned by the entry node */
+
+  for (i = 0; i < lang->languages->len; i++)
+    {
+      PdbLangEntry *entry = &g_array_index (lang->languages, PdbLangEntry, i);
+
+      g_hash_table_insert (lang->hash_table, entry->code, entry);
+    }
+}
+
 PdbLang *
 pdb_lang_new (PdbRevo *revo,
               GError **error)
@@ -110,6 +131,7 @@ pdb_lang_new (PdbRevo *revo,
   lang->in_lingvo = FALSE;
   lang->name_buf = g_string_new (NULL);
   lang->code_buf = g_string_new (NULL);
+  lang->hash_table = g_hash_table_new (g_str_hash, g_str_equal);
 
   XML_SetUserData (lang->parser, lang);
 
@@ -122,6 +144,8 @@ pdb_lang_new (PdbRevo *revo,
                           "revo/cfg/lingvoj.xml",
                           &parse_error))
     {
+      pdb_lang_init_hash_table (lang);
+
       qsort (lang->languages->data,
              lang->languages->len,
              sizeof (PdbLangEntry),
@@ -150,6 +174,18 @@ pdb_lang_new (PdbRevo *revo,
   return lang;
 }
 
+PdbTrieBuilder *
+pdb_lang_get_trie (PdbLang *lang,
+                   const char *lang_code)
+{
+  PdbLangEntry *entry = g_hash_table_lookup (lang->hash_table, lang_code);
+
+  if (entry)
+    return entry->trie;
+  else
+    return NULL;
+}
+
 void
 pdb_lang_free (PdbLang *lang)
 {
@@ -161,6 +197,7 @@ pdb_lang_free (PdbLang *lang)
 
       g_free (entry->name);
       g_free (entry->code);
+      pdb_trie_builder_free (entry->trie);
     }
 
   g_array_free (lang->languages, TRUE);
@@ -169,6 +206,8 @@ pdb_lang_free (PdbLang *lang)
 
   g_string_free (lang->name_buf, TRUE);
   g_string_free (lang->code_buf, TRUE);
+
+  g_hash_table_destroy (lang->hash_table);
 
   g_slice_free (PdbLang, lang);
 }
