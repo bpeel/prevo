@@ -28,3 +28,12 @@ prevodb_LDADD = \
 	-lexpat \
 	@GLIB_LIBS@ \
 	$(NULL)
+
+noinst_PROGRAMS = dump-index
+
+dump_index_SOURCES = \
+	dump-index.c
+
+dump_index_LDADD = \
+	@GLIB_LIBS@ \
+	$(NULL)

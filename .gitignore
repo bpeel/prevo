@@ -19,6 +19,7 @@
 /prevodb/src/Makefile
 /prevodb/src/Makefile.in
 /prevodb/src/prevodb
+/prevodb/src/dump-index
 /prevodb/stamp-h1
 
 .deps
