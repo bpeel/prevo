@@ -9,15 +9,15 @@ pdb_error_quark (void)
 }
 
 void
-pdb_error_from_parser (XML_Parser parser,
+pdb_error_from_parser (PdbXmlParser *parser,
                        const char *filename,
                        GError **error)
 {
   int code;
 
-  switch (XML_GetErrorCode (parser))
+  switch (pdb_xml_get_error_code (parser))
     {
-    case XML_ERROR_ABORTED:
+    case PDB_XML_ERROR_ABORTED:
       code = PDB_ERROR_ABORTED;
       break;
 
@@ -28,7 +28,7 @@ pdb_error_from_parser (XML_Parser parser,
 
   g_set_error (error, PDB_ERROR, code, "%s:%i:%i %s",
                filename,
-               (int) XML_GetCurrentLineNumber (parser),
-               (int) XML_GetCurrentColumnNumber (parser),
-               XML_ErrorString (XML_GetErrorCode (parser)));
+               (int) pdb_xml_get_current_line_number (parser),
+               (int) pdb_xml_get_current_column_number (parser),
+               pdb_xml_error_string (pdb_xml_get_error_code (parser)));
 }

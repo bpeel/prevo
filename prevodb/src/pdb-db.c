@@ -1,6 +1,5 @@
 #include "config.h"
 
-#include <expat.h>
 #include <string.h>
 
 #include "pdb-db.h"
@@ -22,7 +21,7 @@ typedef struct
 
 struct _PdbDb
 {
-  XML_Parser parser;
+  PdbXmlParser *parser;
 
   GError *error;
 
@@ -56,11 +55,11 @@ pdb_db_add_mark (PdbDb *db,
 
 static void
 pdb_db_start_element_cb (void *user_data,
-                         const XML_Char *name,
-                         const XML_Char **atts)
+                         const char *name,
+                         const char **atts)
 {
   PdbDb *db = user_data;
-  const XML_Char **att;
+  const char **att;
 
   g_string_append (db->article_buf, "<span");
 
@@ -88,7 +87,7 @@ pdb_db_start_element_cb (void *user_data,
 
 static void
 pdb_db_end_element_cb (void *user_data,
-                       const XML_Char *name)
+                       const char *name)
 {
   PdbDb *db = user_data;
 
@@ -129,7 +128,7 @@ pdb_db_append_data (PdbDb *db,
 
 static void
 pdb_db_character_data_cb (void *user_data,
-                          const XML_Char *s,
+                          const char *s,
                           int len)
 {
   PdbDb *db = user_data;
@@ -160,7 +159,7 @@ pdb_db_new (PdbRevo *revo,
   db = g_slice_new (PdbDb);
   db->lang = lang;
 
-  db->parser = XML_ParserCreate (NULL /* encoding */);
+  db->parser = pdb_xml_parser_new ();
   db->error = NULL;
   db->article_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
@@ -186,23 +185,25 @@ pdb_db_new (PdbRevo *revo,
         {
           const char *file = *file_p;
 
-          XML_ParserReset (db->parser, NULL /* encoding */);
+          pdb_xml_parser_reset (db->parser);
 
-          XML_SetUserData (db->parser, db);
+          pdb_xml_set_user_data (db->parser, db);
 
-          XML_SetStartElementHandler (db->parser, pdb_db_start_element_cb);
-          XML_SetEndElementHandler (db->parser, pdb_db_end_element_cb);
-          XML_SetCharacterDataHandler (db->parser, pdb_db_character_data_cb);
+          pdb_xml_set_element_handler (db->parser,
+                                       pdb_db_start_element_cb,
+                                       pdb_db_end_element_cb);
+          pdb_xml_set_character_data_handler (db->parser,
+                                              pdb_db_character_data_cb);
 
           g_string_set_size (db->article_buf, 0);
 
           db->next_article = g_slice_new (PdbDbArticle);
           db->article_mark_count = 0;
 
-          if (pdb_revo_parse_xml (revo,
-                                  db->parser,
-                                  file,
-                                  &parse_error))
+          if (pdb_xml_parse (db->parser,
+                             revo,
+                             file,
+                             &parse_error))
             {
               PdbDbArticle *article = db->next_article;
 
@@ -251,7 +252,7 @@ pdb_db_free (PdbDb *db)
 
   pdb_lang_free (db->lang);
 
-  XML_ParserFree (db->parser);
+  pdb_xml_parser_free (db->parser);
 
   g_string_free (db->article_buf, TRUE);
 

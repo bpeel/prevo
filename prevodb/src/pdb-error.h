@@ -2,7 +2,8 @@
 #define PDB_ERROR_H
 
 #include <glib.h>
-#include <expat.h>
+
+#include "pdb-xml.h"
 
 #define PDB_ERROR (pdb_error_quark ())
 
@@ -18,7 +19,7 @@ GQuark
 pdb_error_quark (void);
 
 void
-pdb_error_from_parser (XML_Parser parser,
+pdb_error_from_parser (PdbXmlParser *parser,
                        const char *filename,
                        GError **error);
 

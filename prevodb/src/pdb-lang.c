@@ -1,7 +1,7 @@
 #include "config.h"
 
-#include <expat.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "pdb-lang.h"
 #include "pdb-error.h"
@@ -18,7 +18,7 @@ typedef struct
 
 struct _PdbLang
 {
-  XML_Parser parser;
+  PdbXmlParser *parser;
 
   GError *error;
 
@@ -32,8 +32,8 @@ struct _PdbLang
 
 static void
 pdb_lang_start_element_cb (void *user_data,
-                           const XML_Char *name,
-                           const XML_Char **atts)
+                           const char *name,
+                           const char **atts)
 {
   PdbLang *lang = user_data;
 
@@ -43,7 +43,7 @@ pdb_lang_start_element_cb (void *user_data,
                    PDB_ERROR,
                    PDB_ERROR_BAD_FORMAT,
                    "Unexpected tag in a ‘lingvo’ tag");
-      XML_StopParser (lang->parser, FALSE);
+      pdb_xml_stop_parser (lang->parser);
     }
   else if (!strcmp (name, "lingvo"))
     {
@@ -57,13 +57,13 @@ pdb_lang_start_element_cb (void *user_data,
           lang->in_lingvo = TRUE;
         }
       else
-        XML_StopParser (lang->parser, FALSE);
+        pdb_xml_stop_parser (lang->parser);
     }
 }
 
 static void
 pdb_lang_end_element_cb (void *user_data,
-                         const XML_Char *name)
+                         const char *name)
 {
   PdbLang *lang = user_data;
   PdbLangEntry *entry;
@@ -91,7 +91,7 @@ pdb_lang_compare_name (const void *a,
 
 static void
 pdb_lang_character_data_cb (void *user_data,
-                            const XML_Char *s,
+                            const char *s,
                             int len)
 {
   PdbLang *lang = user_data;
@@ -125,7 +125,7 @@ pdb_lang_new (PdbRevo *revo,
   GError *parse_error = NULL;
 
   lang->languages = g_array_new (FALSE, FALSE, sizeof (PdbLangEntry));
-  lang->parser = XML_ParserCreate (NULL);
+  lang->parser = pdb_xml_parser_new ();
   lang->error = NULL;
 
   lang->in_lingvo = FALSE;
@@ -133,16 +133,17 @@ pdb_lang_new (PdbRevo *revo,
   lang->code_buf = g_string_new (NULL);
   lang->hash_table = g_hash_table_new (g_str_hash, g_str_equal);
 
-  XML_SetUserData (lang->parser, lang);
+  pdb_xml_set_user_data (lang->parser, lang);
 
-  XML_SetStartElementHandler (lang->parser, pdb_lang_start_element_cb);
-  XML_SetEndElementHandler (lang->parser, pdb_lang_end_element_cb);
-  XML_SetCharacterDataHandler (lang->parser, pdb_lang_character_data_cb);
+  pdb_xml_set_element_handler (lang->parser,
+                               pdb_lang_start_element_cb,
+                               pdb_lang_end_element_cb);
+  pdb_xml_set_character_data_handler (lang->parser, pdb_lang_character_data_cb);
 
-  if (pdb_revo_parse_xml (revo,
-                          lang->parser,
-                          "revo/cfg/lingvoj.xml",
-                          &parse_error))
+  if (pdb_xml_parse (lang->parser,
+                     revo,
+                     "revo/cfg/lingvoj.xml",
+                     &parse_error))
     {
       pdb_lang_init_hash_table (lang);
 
@@ -202,7 +203,7 @@ pdb_lang_free (PdbLang *lang)
 
   g_array_free (lang->languages, TRUE);
 
-  XML_ParserFree (lang->parser);
+  pdb_xml_parser_free (lang->parser);
 
   g_string_free (lang->name_buf, TRUE);
   g_string_free (lang->code_buf, TRUE);

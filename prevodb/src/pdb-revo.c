@@ -13,20 +13,6 @@ struct _PdbRevo
   char *zip_file;
 };
 
-typedef enum
-{
-  PDB_REVO_COMMAND_STATUS_OK,
-  PDB_REVO_COMMAND_STATUS_ABORT,
-  PDB_REVO_COMMAND_STATUS_ERROR
-} PdbRevoCommandStatus;
-
-typedef PdbRevoCommandStatus
-(* PdbRevoCommandCb) (const char *buf,
-                      int len,
-                      gboolean end,
-                      void *user_data,
-                      GError **error);
-
 PdbRevo *
 pdb_revo_new (const char *filename,
               GError **error)
@@ -42,7 +28,7 @@ pdb_revo_new (const char *filename,
 static gboolean
 pdb_revo_execute_command (PdbRevo *revo,
                           char **argv,
-                          PdbRevoCommandCb func,
+                          PdbRevoReadCb func,
                           void *user_data,
                           GError **error)
 {
@@ -55,7 +41,7 @@ pdb_revo_execute_command (PdbRevo *revo,
   gboolean in_end = FALSE, err_end = FALSE;
   gboolean aborted = FALSE;
   int child_status;
-  PdbRevoCommandStatus func_status;
+  PdbRevoReadStatus func_status;
 
   if (!g_spawn_async_with_pipes (NULL, /* working dir */
                                  argv,
@@ -127,9 +113,9 @@ pdb_revo_execute_command (PdbRevo *revo,
                                             got == 0,
                                             user_data,
                                             error)) !=
-                       PDB_REVO_COMMAND_STATUS_OK)
+                       PDB_REVO_READ_STATUS_OK)
                 {
-                  if (func_status == PDB_REVO_COMMAND_STATUS_ABORT)
+                  if (func_status == PDB_REVO_READ_STATUS_ABORT)
                     aborted = TRUE;
                   ret = FALSE;
                   goto done;
@@ -205,58 +191,12 @@ pdb_revo_execute_command (PdbRevo *revo,
 
 typedef struct
 {
-  const char *filename;
-  XML_Parser parser;
-} PdbRevoParseXmlData;
-
-static PdbRevoCommandStatus
-pdb_revo_parse_xml_cb (const char *buf,
-                       int len,
-                       gboolean end,
-                       void *user_data,
-                       GError **error)
-{
-  PdbRevoParseXmlData *data = user_data;
-
-  if (XML_Parse (data->parser, buf, len, end) == XML_STATUS_ERROR)
-    {
-      pdb_error_from_parser (data->parser, data->filename, error);
-      if (XML_GetErrorCode (data->parser) == XML_ERROR_ABORTED)
-        return PDB_REVO_COMMAND_STATUS_ABORT;
-      else
-        return PDB_REVO_COMMAND_STATUS_ERROR;
-    }
-  else
-    return PDB_REVO_COMMAND_STATUS_OK;
-}
-
-gboolean
-pdb_revo_parse_xml (PdbRevo *revo,
-                    XML_Parser parser,
-                    const char *filename,
-                    GError **error)
-{
-  PdbRevoParseXmlData data;
-  char *argv[] = { "unzip", "-p", revo->zip_file, (char *) filename, NULL };
-
-  data.filename = filename;
-  data.parser = parser;
-
-  return pdb_revo_execute_command (revo,
-                                   argv,
-                                   pdb_revo_parse_xml_cb,
-                                   &data,
-                                   error);
-}
-
-typedef struct
-{
   GString *line_buf;
   GPtrArray *files;
   gboolean in_list;
 } PdbRevoListFilesData;
 
-static PdbRevoCommandStatus
+static PdbRevoReadStatus
 pdb_revo_list_files_process_line (const char *line,
                                   PdbRevoListFilesData *data,
                                   GError **error)
@@ -264,7 +204,7 @@ pdb_revo_list_files_process_line (const char *line,
   if (g_str_has_prefix (line, "---"))
     {
       data->in_list = !data->in_list;
-      return PDB_REVO_COMMAND_STATUS_OK;
+      return PDB_REVO_READ_STATUS_OK;
     }
 
   if (data->in_list)
@@ -294,7 +234,7 @@ pdb_revo_list_files_process_line (const char *line,
       g_ptr_array_add (data->files, g_strdup (line));
     }
 
-  return PDB_REVO_COMMAND_STATUS_OK;
+  return PDB_REVO_READ_STATUS_OK;
 
  error:
   g_set_error (error,
@@ -302,10 +242,10 @@ pdb_revo_list_files_process_line (const char *line,
                PDB_ERROR_UNZIP_FAILED,
                "Unexepected data from unzip");
 
-  return PDB_REVO_COMMAND_STATUS_ERROR;
+  return PDB_REVO_READ_STATUS_ERROR;
 }
 
-static PdbRevoCommandStatus
+static PdbRevoReadStatus
 pdb_revo_list_files_cb (const char *buf,
                         int len,
                         gboolean end,
@@ -320,7 +260,7 @@ pdb_revo_list_files_cb (const char *buf,
     {
       g_set_error (error, PDB_ERROR, PDB_ERROR_BAD_FORMAT,
                    "%s", "Embedded '\0' found in unzip listing");
-      return PDB_REVO_COMMAND_STATUS_ABORT;
+      return PDB_REVO_READ_STATUS_ABORT;
     }
 
   g_string_append_len (data->line_buf, buf, len);
@@ -329,7 +269,7 @@ pdb_revo_list_files_cb (const char *buf,
                              '\n',
                              data->line_buf->len - pos)))
     {
-      PdbRevoCommandStatus status;
+      PdbRevoReadStatus status;
 
       *line_end = '\0';
 
@@ -339,7 +279,7 @@ pdb_revo_list_files_cb (const char *buf,
       status = pdb_revo_list_files_process_line (data->line_buf->str + pos,
                                                  data,
                                                  error);
-      if (status != PDB_REVO_COMMAND_STATUS_OK)
+      if (status != PDB_REVO_READ_STATUS_OK)
         return status;
 
       pos = line_end - data->line_buf->str + 1;
@@ -351,7 +291,7 @@ pdb_revo_list_files_cb (const char *buf,
            data->line_buf->len - pos);
   g_string_set_size (data->line_buf, data->line_buf->len - pos);
 
-  return PDB_REVO_COMMAND_STATUS_OK;
+  return PDB_REVO_READ_STATUS_OK;
 }
 
 char **
@@ -390,6 +330,22 @@ pdb_revo_list_files (PdbRevo *revo,
   g_string_free (data.line_buf, TRUE);
 
   return ret;
+}
+
+gboolean
+pdb_revo_parse_file (PdbRevo *revo,
+                     const char *filename,
+                     PdbRevoReadCb func,
+                     void *user_data,
+                     GError **error)
+{
+  char *argv[] = { "unzip", "-p", revo->zip_file, (char *) filename, NULL };
+
+  return pdb_revo_execute_command (revo,
+                                   argv,
+                                   func,
+                                   user_data,
+                                   error);
 }
 
 void
