@@ -12,6 +12,8 @@ prevodb_SOURCES = \
 	pdb-error.h \
 	pdb-lang.c \
 	pdb-lang.h \
+	pdb-mkdir.c \
+	pdb-mkdir.h \
 	pdb-revo.c \
 	pdb-revo.h \
 	pdb-strcmp.c \

@@ -12,9 +12,9 @@ main (int argc, char **argv)
   PdbRevo *revo;
   int ret = 0;
 
-  if (argc != 2)
+  if (argc != 3)
     {
-      fprintf (stderr, "usage: prevodb <revo zip file>\n");
+      fprintf (stderr, "usage: prevodb <revo zip file> <out directory>\n");
       ret = 1;
     }
   else
@@ -39,6 +39,13 @@ main (int argc, char **argv)
             }
           else
             {
+              if (!pdb_db_save (db, argv[2], &error))
+                {
+                  fprintf (stderr, "%s\n", error->message);
+                  g_clear_error (&error);
+                  ret = 1;
+                }
+
               pdb_db_free (db);
             }
 

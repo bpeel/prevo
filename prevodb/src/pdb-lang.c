@@ -8,6 +8,7 @@
 #include "pdb-xml.h"
 #include "pdb-strcmp.h"
 #include "pdb-trie.h"
+#include "pdb-mkdir.h"
 
 typedef struct
 {
@@ -103,15 +104,15 @@ pdb_lang_init_hash_table (PdbLang *lang)
 {
   int i;
 
-  /* This intialises the hash table with the entries found in the list
+  /* This intialises the hash table with the tries found in the list
    * of languages. The key is the language code and the value is the
-   * language entry node. The key is owned by the entry node */
+   * trie. The key is owned by the entry node */
 
   for (i = 0; i < lang->languages->len; i++)
     {
       PdbLangEntry *entry = &g_array_index (lang->languages, PdbLangEntry, i);
 
-      g_hash_table_insert (lang->hash_table, entry->code, entry);
+      g_hash_table_insert (lang->hash_table, entry->code, entry->trie);
     }
 }
 
@@ -161,12 +162,7 @@ PdbTrieBuilder *
 pdb_lang_get_trie (PdbLang *lang,
                    const char *lang_code)
 {
-  PdbLangEntry *entry = g_hash_table_lookup (lang->hash_table, lang_code);
-
-  if (entry)
-    return entry->trie;
-  else
-    return NULL;
+  return g_hash_table_lookup (lang->hash_table, lang_code);
 }
 
 void
@@ -193,4 +189,59 @@ pdb_lang_free (PdbLang *lang)
   g_hash_table_destroy (lang->hash_table);
 
   g_slice_free (PdbLang, lang);
+}
+
+gboolean
+pdb_lang_save (PdbLang *lang,
+               const char *dir,
+               GError **error)
+{
+  char *index_dir;
+  gboolean ret = TRUE;
+
+  if (!pdb_try_mkdir (dir, error))
+    return FALSE;
+
+  index_dir = g_build_filename (dir, "indices", NULL);
+
+  if (pdb_try_mkdir (index_dir, error))
+    {
+      int i;
+
+      for (i = 0; i < lang->languages->len; i++)
+        {
+          PdbLangEntry *entry =
+            &g_array_index (lang->languages, PdbLangEntry, i);
+          char *index_name = g_strdup_printf ("index-%s.bin", entry->code);
+          char *full_name = g_build_filename (index_dir, index_name, NULL);
+          guint8 *compressed_data;
+          int compressed_len;
+          gboolean write_status;
+
+          pdb_trie_builder_compress (entry->trie,
+                                     &compressed_data,
+                                     &compressed_len);
+
+          write_status = g_file_set_contents (full_name,
+                                              (char *) compressed_data,
+                                              compressed_len,
+                                              error);
+
+          g_free (full_name);
+          g_free (index_name);
+          g_free (compressed_data);
+
+          if (!write_status)
+            {
+              break;
+              ret = FALSE;
+            }
+        }
+    }
+  else
+    ret = FALSE;
+
+  g_free (index_dir);
+
+  return ret;
 }

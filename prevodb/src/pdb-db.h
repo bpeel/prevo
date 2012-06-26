@@ -11,6 +11,11 @@ PdbDb *
 pdb_db_new (PdbRevo *revo,
             GError **error);
 
+gboolean
+pdb_db_save (PdbDb *db,
+             const char *dir,
+             GError **error);
+
 void
 pdb_db_free (PdbDb *db);
 

@@ -6,6 +6,7 @@
 #include "pdb-lang.h"
 #include "pdb-error.h"
 #include "pdb-xml.h"
+#include "pdb-mkdir.h"
 
 typedef struct
 {
@@ -523,8 +524,6 @@ pdb_db_new (PdbRevo *revo,
                                         db->article_buf->len + 1);
               article->length = db->article_buf->len;
 
-              g_print ("%s", article->text);
-
               g_ptr_array_add (db->articles, article);
             }
           else
@@ -569,4 +568,54 @@ pdb_db_free (PdbDb *db)
   g_hash_table_destroy (db->marks);
 
   g_slice_free (PdbDb, db);
+}
+
+gboolean
+pdb_db_save (PdbDb *db,
+             const char *dir,
+             GError **error)
+{
+  char *article_dir;
+  gboolean ret = TRUE;
+
+  if (!pdb_try_mkdir (dir, error))
+    return FALSE;
+
+  if (!pdb_lang_save (db->lang, dir, error))
+    return FALSE;
+
+  article_dir = g_build_filename (dir, "articles", NULL);
+
+  if (pdb_try_mkdir (article_dir, error))
+    {
+      int i;
+
+      for (i = 0; i < db->articles->len; i++)
+        {
+          PdbDbArticle *article = g_ptr_array_index (db->articles, i);
+          char *article_name = g_strdup_printf ("article-%i.html", i);
+          char *full_name = g_build_filename (article_dir, article_name, NULL);
+          gboolean write_status;
+
+          write_status = g_file_set_contents (full_name,
+                                              article->text,
+                                              article->length,
+                                              error);
+
+          g_free (full_name);
+          g_free (article_name);
+
+          if (!write_status)
+            {
+              break;
+              ret = FALSE;
+            }
+        }
+    }
+  else
+    ret = FALSE;
+
+  g_free (article_dir);
+
+  return ret;
 }

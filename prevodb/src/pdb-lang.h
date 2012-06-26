@@ -19,4 +19,9 @@ pdb_lang_get_trie (PdbLang *lang,
 void
 pdb_lang_free (PdbLang *lang);
 
+gboolean
+pdb_lang_save (PdbLang *lang,
+               const char *dir,
+               GError **error);
+
 #endif /* PDB_LANG_H */
