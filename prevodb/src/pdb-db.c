@@ -189,9 +189,10 @@ static void
 pdb_db_pop_end_cb (PdbDb *db,
                    const char *name)
 {
-  g_string_append_printf (db->article_buf,
-                          "</%s>",
-                          (char *) db->stack->data);
+  if (db->stack->data)
+    g_string_append_printf (db->article_buf,
+                            "</%s>",
+                            (char *) db->stack->data);
 
   pdb_db_pop (db);
 }
@@ -210,7 +211,8 @@ pdb_db_in_article_start_cb (PdbDb *db,
                             const char **atts)
 {
   const char **att;
-  const char *tagname;
+  const char *tagname = NULL;
+  const char *mark = NULL;
 
   if (!strcmp (name, "tld"))
     {
@@ -230,30 +232,38 @@ pdb_db_in_article_start_cb (PdbDb *db,
       return;
     }
 
-  tagname = "span";
-
-  g_string_append_printf (db->article_buf, "<%s", tagname);
-
-  /* Any attribute that has a mrk attribute gets converted to a span
-   * with an id tag and gets added to the mark table */
+  /* Any attribute that has a mrk attribute gets converted to a tag
+   * with an id attribute and gets added to the mark table */
   for (att = atts; att[0]; att += 2)
     if (!strcmp (att[0], "mrk"))
       {
-        pdb_db_add_mark (db,
-                         att[1],
-                         db->next_article,
-                         db->article_mark_count);
-
-        g_string_append_printf (db->article_buf,
-                                " id=\"mrk%i\"",
-                                db->article_mark_count);
-
-        db->article_mark_count++;
-
+        mark = att[1];
         break;
       }
 
-  g_string_append_c (db->article_buf, '>');
+  /* When always need a tag if there is a mark */
+  if (mark != NULL && tagname == NULL)
+    tagname = "span";
+
+  if (tagname != NULL)
+    g_string_append_printf (db->article_buf, "<%s", tagname);
+
+  if (mark != NULL)
+    {
+      pdb_db_add_mark (db,
+                       mark,
+                       db->next_article,
+                       db->article_mark_count);
+
+      g_string_append_printf (db->article_buf,
+                              " id=\"mrk%i\"",
+                              db->article_mark_count);
+
+      db->article_mark_count++;
+    }
+
+  if (tagname)
+    g_string_append_c (db->article_buf, '>');
 
   pdb_db_push (db,
                pdb_db_in_article_start_cb,
