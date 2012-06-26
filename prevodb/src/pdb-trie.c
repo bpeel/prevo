@@ -11,8 +11,9 @@ typedef struct _PdbTrieNode PdbTrieNode;
 
 struct _PdbTrieBuilder
 {
-  int word_level;
-  char letter;
+  int article_num;
+  int mark_num;
+  gunichar letter;
   GSList *children;
 };
 
@@ -52,7 +53,8 @@ pdb_trie_builder_new (void)
 {
   PdbTrieBuilder *root = g_slice_new (PdbTrieBuilder);
 
-  root->word_level = 0;
+  root->article_num = -1;
+  root->mark_num = -1;
   root->letter = '['; /* This isn't used anywhere. [ is the next
                          character after Z */
   root->children = NULL;
@@ -62,14 +64,14 @@ pdb_trie_builder_new (void)
 
 void
 pdb_trie_builder_add_word (PdbTrieBuilder *builder,
-                          const gchar *word)
+                           const char *word,
+                           int article_num,
+                           int mark_num)
 {
   while (*word)
     {
       GSList *l;
-      gchar ch = g_ascii_toupper (*word);
-
-      g_assert (ch >= 'A' && ch <= 'Z');
+      gunichar ch = g_utf8_get_char (word);
 
       /* Look for a child with this letter */
       for (l = builder->children; l; l = l->next)
@@ -88,54 +90,17 @@ pdb_trie_builder_add_word (PdbTrieBuilder *builder,
         {
           PdbTrieBuilder *child = pdb_trie_builder_new ();
           child->letter = ch;
+          child->article_num = -1;
+          child->mark_num = -1;
           builder->children = g_slist_prepend (builder->children, child);
           builder = child;
         }
 
-      word++;
+      word = g_utf8_next_char (word);
     };
 
-  /* Use the maximum word level for unknown but valid words */
-  builder->word_level = PDB_TRIE_MAX_WORD_LEVEL;
-}
-
-void
-pdb_trie_builder_set_word_level (PdbTrieBuilder *builder,
-                                const gchar *word,
-                                guint word_level)
-{
-  g_assert (word_level > 0 && word_level <= PDB_TRIE_MAX_WORD_LEVEL);
-
-  while (*word)
-    {
-      GSList *l;
-      gchar ch = g_ascii_toupper (*word);
-
-      g_assert (ch >= 'A' && ch <= 'Z');
-
-      /* Look for a child with this letter */
-      for (l = builder->children; l; l = l->next)
-        {
-          PdbTrieBuilder *child = l->data;
-
-          if (child->letter == ch)
-            {
-              builder = child;
-              break;
-            }
-        }
-
-      /* If we didn't find a child then give up */
-      if (l == NULL)
-        return;
-
-      word++;
-    };
-
-  /* Store the word level for this word only if it's already a valid
-     word */
-  if (builder->word_level)
-    builder->word_level = word_level;
+  builder->article_num = article_num;
+  builder->mark_num = mark_num;
 }
 
 static guint
@@ -156,7 +121,7 @@ pdb_trie_builder_compress_node (PdbTrieBuilder *builder, PdbTrieNode *data)
   guint offset = 1;
   GSList *l;
 
-  data->word_level = builder->word_level;
+  data->word_level = /* builder->word_level */ -1;
   data->letter = builder->letter - 'A';
 
   for (l = builder->children; l; l = l->next)

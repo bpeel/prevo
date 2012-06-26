@@ -38,12 +38,10 @@ PdbTrieBuilder *
 pdb_trie_builder_new (void);
 
 void
-pdb_trie_builder_add_word (PdbTrieBuilder *builder, const gchar *word);
-
-void
-pdb_trie_builder_set_word_level (PdbTrieBuilder *builder,
-                                 const gchar *word,
-                                 guint word_level);
+pdb_trie_builder_add_word (PdbTrieBuilder *builder,
+                           const gchar *word,
+                           int article_num,
+                           int mark_num);
 
 PdbTrie *
 pdb_trie_builder_compress (PdbTrieBuilder *builder);
