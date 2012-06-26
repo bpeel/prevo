@@ -293,18 +293,24 @@ pdb_xml_abort (PdbXmlParser *parser,
                ...)
 {
   va_list ap;
-  char *message;
   GError *error = NULL;
+  GString *message = g_string_new (NULL);
 
   g_assert (parser->abort_error == NULL);
 
+  g_string_append_printf (message,
+                          "%s:%i:%i: ",
+                          pdb_xml_get_current_filename (parser),
+                          pdb_xml_get_current_line_number (parser),
+                          pdb_xml_get_current_column_number (parser));
+
   va_start (ap, format);
-  message = g_strdup_vprintf (format, ap);
+  g_string_append_vprintf (message, format, ap);
   va_end (ap);
 
-  g_set_error_literal (&error, domain, code, message);
+  g_set_error_literal (&error, domain, code, message->str);
 
-  g_free (message);
+  g_string_free (message, TRUE);
 
   pdb_xml_abort_error (parser, error);
 }
