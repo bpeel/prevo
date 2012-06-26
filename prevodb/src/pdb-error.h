@@ -20,7 +20,6 @@ pdb_error_quark (void);
 
 void
 pdb_error_from_parser (PdbXmlParser *parser,
-                       const char *filename,
                        GError **error);
 
 #endif /* PDB_ERROR_H */

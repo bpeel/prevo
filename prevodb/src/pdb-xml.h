@@ -30,7 +30,7 @@ typedef void
                                 int len);
 
 PdbXmlParser *
-pdb_xml_parser_new (void);
+pdb_xml_parser_new (PdbRevo *revo);
 
 void
 pdb_xml_set_element_handler (PdbXmlParser *parser,
@@ -42,7 +42,15 @@ pdb_xml_set_character_data_handler (PdbXmlParser *parser,
                                     PdbXmlCharacterDataHandler handler);
 
 void
-pdb_xml_stop_parser (PdbXmlParser *parser);
+pdb_xml_abort (PdbXmlParser *parser,
+               GQuark domain,
+               gint code,
+               const char *format,
+               ...);
+
+void
+pdb_xml_abort_error (PdbXmlParser *parser,
+                     GError *error);
 
 void
 pdb_xml_parser_free (PdbXmlParser *parser);
@@ -64,6 +72,9 @@ int
 pdb_xml_get_current_column_number (PdbXmlParser *parser);
 
 const char *
+pdb_xml_get_current_filename (PdbXmlParser *parser);
+
+const char *
 pdb_xml_error_string (PdbXmlErrorCode code);
 
 gboolean
@@ -75,7 +86,6 @@ pdb_xml_get_attribute (const char *element_name,
 
 gboolean
 pdb_xml_parse (PdbXmlParser *parser,
-               PdbRevo *revo,
                const char *filename,
                GError **error);
 

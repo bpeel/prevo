@@ -149,7 +149,6 @@ pdb_db_new (PdbRevo *revo,
   PdbDb *db;
   PdbLang *lang;
   char **files;
-  GError *parse_error = NULL;
 
   lang = pdb_lang_new (revo, error);
 
@@ -159,7 +158,7 @@ pdb_db_new (PdbRevo *revo,
   db = g_slice_new (PdbDb);
   db->lang = lang;
 
-  db->parser = pdb_xml_parser_new ();
+  db->parser = pdb_xml_parser_new (revo);
   db->error = NULL;
   db->article_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
@@ -201,9 +200,8 @@ pdb_db_new (PdbRevo *revo,
           db->article_mark_count = 0;
 
           if (pdb_xml_parse (db->parser,
-                             revo,
                              file,
-                             &parse_error))
+                             error))
             {
               PdbDbArticle *article = db->next_article;
 
@@ -217,19 +215,6 @@ pdb_db_new (PdbRevo *revo,
             }
           else
             {
-              if (parse_error->domain == PDB_ERROR &&
-                  parse_error->code == PDB_ERROR_ABORTED)
-                {
-                  g_warn_if_fail (db->error != NULL);
-                  g_clear_error (&parse_error);
-                  g_propagate_error (error, db->error);
-                }
-              else
-                {
-                  g_warn_if_fail (db->error == NULL);
-                  g_propagate_error (error, parse_error);
-                }
-
               g_slice_free (PdbDbArticle, db->next_article);
 
               pdb_db_free (db);

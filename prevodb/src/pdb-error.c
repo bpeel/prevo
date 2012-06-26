@@ -10,7 +10,6 @@ pdb_error_quark (void)
 
 void
 pdb_error_from_parser (PdbXmlParser *parser,
-                       const char *filename,
                        GError **error)
 {
   int code;
@@ -27,7 +26,7 @@ pdb_error_from_parser (PdbXmlParser *parser,
     }
 
   g_set_error (error, PDB_ERROR, code, "%s:%i:%i %s",
-               filename,
+               pdb_xml_get_current_filename (parser),
                (int) pdb_xml_get_current_line_number (parser),
                (int) pdb_xml_get_current_column_number (parser),
                pdb_xml_error_string (pdb_xml_get_error_code (parser)));

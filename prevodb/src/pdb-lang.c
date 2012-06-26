@@ -20,8 +20,6 @@ struct _PdbLang
 {
   PdbXmlParser *parser;
 
-  GError *error;
-
   GArray *languages;
   GHashTable *hash_table;
 
@@ -39,17 +37,17 @@ pdb_lang_start_element_cb (void *user_data,
 
   if (lang->in_lingvo)
     {
-      g_set_error (&lang->error,
-                   PDB_ERROR,
-                   PDB_ERROR_BAD_FORMAT,
-                   "Unexpected tag in a ‘lingvo’ tag");
-      pdb_xml_stop_parser (lang->parser);
+      pdb_xml_abort (lang->parser,
+                     PDB_ERROR,
+                     PDB_ERROR_BAD_FORMAT,
+                     "Unexpected tag in a ‘lingvo’ tag");
     }
   else if (!strcmp (name, "lingvo"))
     {
       const char *code;
+      GError *attrib_error = NULL;
 
-      if (pdb_xml_get_attribute (name, atts, "kodo", &code, &lang->error))
+      if (pdb_xml_get_attribute (name, atts, "kodo", &code, &attrib_error))
         {
           g_string_set_size (lang->code_buf, 0);
           g_string_append (lang->code_buf, code);
@@ -57,7 +55,7 @@ pdb_lang_start_element_cb (void *user_data,
           lang->in_lingvo = TRUE;
         }
       else
-        pdb_xml_stop_parser (lang->parser);
+        pdb_xml_abort_error (lang->parser, attrib_error);
     }
 }
 
@@ -122,11 +120,9 @@ pdb_lang_new (PdbRevo *revo,
               GError **error)
 {
   PdbLang *lang = g_slice_new (PdbLang);
-  GError *parse_error = NULL;
 
   lang->languages = g_array_new (FALSE, FALSE, sizeof (PdbLangEntry));
-  lang->parser = pdb_xml_parser_new ();
-  lang->error = NULL;
+  lang->parser = pdb_xml_parser_new (revo);
 
   lang->in_lingvo = FALSE;
   lang->name_buf = g_string_new (NULL);
@@ -141,9 +137,8 @@ pdb_lang_new (PdbRevo *revo,
   pdb_xml_set_character_data_handler (lang->parser, pdb_lang_character_data_cb);
 
   if (pdb_xml_parse (lang->parser,
-                     revo,
                      "revo/cfg/lingvoj.xml",
-                     &parse_error))
+                     error))
     {
       pdb_lang_init_hash_table (lang);
 
@@ -154,19 +149,6 @@ pdb_lang_new (PdbRevo *revo,
     }
   else
     {
-      if (parse_error->domain == PDB_ERROR &&
-          parse_error->code == PDB_ERROR_ABORTED)
-        {
-          g_warn_if_fail (lang->error != NULL);
-          g_clear_error (&parse_error);
-          g_propagate_error (error, lang->error);
-        }
-      else
-        {
-          g_warn_if_fail (lang->error == NULL);
-          g_propagate_error (error, parse_error);
-        }
-
       pdb_lang_free (lang);
 
       lang = NULL;
