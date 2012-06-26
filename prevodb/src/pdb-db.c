@@ -30,6 +30,18 @@ typedef void (* PdbDbCharacterDataHandler) (PdbDb *db,
                                             const char *s,
                                             int len);
 
+#define PDB_DB_FLAG_IN_DRV (1 << 0)
+
+static void
+pdb_db_handle_article_tag (PdbDb *db,
+                           const char *name,
+                           const char **atts);
+
+static void
+pdb_db_in_article_start_cb (PdbDb *db,
+                            const char *name,
+                            const char **atts);
+
 struct _PdbDbStackEntry
 {
   PdbDbStartElementHandler start_element_handler;
@@ -38,7 +50,9 @@ struct _PdbDbStackEntry
 
   PdbDbStackEntry *next;
 
+  int mark;
   int depth;
+  int flags;
   void *data;
 };
 
@@ -62,7 +76,21 @@ struct _PdbDb
   int article_mark_count;
 
   GString *word_root;
+  GString *kap_buf;
 };
+
+static void
+pdb_db_add_index_entry (PdbDb *db,
+                        const char *lang,
+                        const char *name,
+                        int article_num,
+                        int mark_num)
+{
+  PdbTrieBuilder *trie = pdb_lang_get_trie (db->lang, lang);
+
+  if (trie)
+    pdb_trie_builder_add_word (trie, name, article_num, mark_num);
+}
 
 static void
 pdb_db_append_data (PdbDb *db,
@@ -126,6 +154,8 @@ pdb_db_push (PdbDb *db,
   entry->character_data_handler = character_data_handler;
   entry->depth = 1;
   entry->data = 0;
+  entry->mark = db->stack ? db->stack->mark : -1;
+  entry->flags = db->stack ? db->stack->flags : 0;
 
   db->stack = entry;
 }
@@ -206,13 +236,64 @@ pdb_db_append_cd_cb (PdbDb *db,
 }
 
 static void
-pdb_db_in_article_start_cb (PdbDb *db,
-                            const char *name,
-                            const char **atts)
+pdb_db_kap_start_cb (PdbDb *db,
+                     const char *name,
+                     const char **atts)
+{
+  if (!strcmp (name, "tld"))
+    g_string_append_len (db->kap_buf,
+                         db->word_root->str,
+                         db->word_root->len);
+
+  pdb_db_handle_article_tag (db, name, atts);
+}
+
+static void
+pdb_db_kap_end_cb (PdbDb *db,
+                   const char *name)
+{
+  if (db->stack->mark == -1)
+    pdb_xml_abort (db->parser,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "Headword found with no containing mrk");
+  else
+    {
+      pdb_db_add_index_entry (db,
+                              "eo",
+                              db->kap_buf->str,
+                              db->articles->len,
+                              db->stack->mark);
+      g_string_append (db->article_buf, "</div>");
+    }
+
+  pdb_db_pop (db);
+}
+
+static void
+pdb_db_kap_cd_cb (PdbDb *db,
+                  const char *s,
+                  int len)
+{
+  int pos = db->article_buf->len;
+
+  pdb_db_append_data (db, s, len);
+
+  g_string_append_len (db->kap_buf,
+                       db->article_buf->str + pos,
+                       db->article_buf->len - pos);
+}
+
+static void
+pdb_db_handle_article_tag (PdbDb *db,
+                           const char *name,
+                           const char **atts)
 {
   const char **att;
   const char *tagname = NULL;
+  const char *klass = NULL;
   const char *mark = NULL;
+  int flags = db->stack->flags;
 
   if (!strcmp (name, "tld"))
     {
@@ -231,6 +312,43 @@ pdb_db_in_article_start_cb (PdbDb *db,
       g_string_set_size (db->word_root, 0);
       return;
     }
+  else if (!strcmp (name, "fnt") ||
+           !strcmp (name, "adm"))
+    {
+      pdb_db_push_skip (db);
+      return;
+    }
+  else if (!strcmp (name, "trd") || !strcmp (name, "trdgrp"))
+    {
+      /* TODO: queue translations for later */
+      pdb_db_push_skip (db);
+      return;
+    }
+  else if (!strcmp (name, "drv"))
+    {
+      klass = "drv";
+      tagname = "div";
+      flags |= PDB_DB_FLAG_IN_DRV;
+    }
+  else if (!strcmp (name, "kap"))
+    {
+      if ((flags & PDB_DB_FLAG_IN_DRV) == 0)
+        {
+          klass = "article-title";
+          tagname = "div";
+        }
+      else
+        {
+          g_string_append (db->article_buf,
+                           "<div class=\"drv-title\">");
+          g_string_set_size (db->kap_buf, 0);
+          pdb_db_push (db,
+                       pdb_db_kap_start_cb,
+                       pdb_db_kap_end_cb,
+                       pdb_db_kap_cd_cb);
+          return;
+        }
+    }
 
   /* Any attribute that has a mrk attribute gets converted to a tag
    * with an id attribute and gets added to the mark table */
@@ -241,7 +359,7 @@ pdb_db_in_article_start_cb (PdbDb *db,
         break;
       }
 
-  /* When always need a tag if there is a mark */
+  /* We always need a tag if there is a mark */
   if (mark != NULL && tagname == NULL)
     tagname = "span";
 
@@ -258,9 +376,10 @@ pdb_db_in_article_start_cb (PdbDb *db,
       g_string_append_printf (db->article_buf,
                               " id=\"mrk%i\"",
                               db->article_mark_count);
-
-      db->article_mark_count++;
     }
+
+  if (klass != NULL)
+    g_string_append_printf (db->article_buf, " class=\"%s\"", klass);
 
   if (tagname)
     g_string_append_c (db->article_buf, '>');
@@ -270,6 +389,18 @@ pdb_db_in_article_start_cb (PdbDb *db,
                pdb_db_pop_end_cb,
                pdb_db_append_cd_cb);
   db->stack->data = (void *) tagname;
+  db->stack->flags = flags;
+
+  if (mark != NULL)
+    db->stack->mark = db->article_mark_count++;
+}
+
+static void
+pdb_db_in_article_start_cb (PdbDb *db,
+                            const char *name,
+                            const char **atts)
+{
+  pdb_db_handle_article_tag (db, name, atts);
 }
 
 static void
@@ -327,6 +458,7 @@ pdb_db_new (PdbRevo *revo,
   db->error = NULL;
   db->article_buf = g_string_new (NULL);
   db->word_root = g_string_new (NULL);
+  db->kap_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
   db->next_article = NULL;
   db->stack = NULL;
@@ -422,6 +554,7 @@ pdb_db_free (PdbDb *db)
   pdb_xml_parser_free (db->parser);
 
   g_string_free (db->word_root, TRUE);
+  g_string_free (db->kap_buf, TRUE);
   g_string_free (db->article_buf, TRUE);
 
   for (i = 0; i < db->articles->len; i++)
