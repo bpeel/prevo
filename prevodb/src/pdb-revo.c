@@ -332,6 +332,39 @@ pdb_revo_list_files (PdbRevo *revo,
   return ret;
 }
 
+static char *
+pdb_revo_expand_filename (const char *filename)
+{
+  char **parts = g_strsplit (filename, "/", 0);
+  char **parts_copy;
+  char **src, **dst;
+  char *ret;
+  int n_parts;
+
+  for (n_parts = 0; parts[n_parts]; n_parts++);
+
+  parts_copy = g_alloca (sizeof (char *) * (n_parts + 1));
+
+  for (src = parts, dst = parts_copy; *src; src++)
+    {
+      if (!strcmp (*src, ".."))
+        {
+          if (dst > parts_copy)
+            dst--;
+        }
+      else if (strcmp (*src, "."))
+        *(dst++) = *src;
+    }
+
+  *(dst++) = NULL;
+
+  ret = g_strjoinv ("/", parts_copy);
+
+  g_strfreev (parts);
+
+  return ret;
+}
+
 gboolean
 pdb_revo_parse_file (PdbRevo *revo,
                      const char *filename,
@@ -339,13 +372,20 @@ pdb_revo_parse_file (PdbRevo *revo,
                      void *user_data,
                      GError **error)
 {
-  char *argv[] = { "unzip", "-p", revo->zip_file, (char *) filename, NULL };
+  char *argv[] = { "unzip", "-p", revo->zip_file, NULL, NULL };
+  gboolean ret;
 
-  return pdb_revo_execute_command (revo,
-                                   argv,
-                                   func,
-                                   user_data,
-                                   error);
+  argv[3] = pdb_revo_expand_filename (filename);
+
+  ret = pdb_revo_execute_command (revo,
+                                  argv,
+                                  func,
+                                  user_data,
+                                  error);
+
+  g_free (argv[3]);
+
+  return ret;
 }
 
 void
