@@ -6,6 +6,8 @@ INCLUDES = \
 
 prevodb_SOURCES = \
 	main.c \
+	pdb-db.c \
+	pdb-db.h \
 	pdb-error.c \
 	pdb-error.h \
 	pdb-lang.c \

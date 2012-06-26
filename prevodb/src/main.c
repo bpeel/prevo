@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include "pdb-revo.h"
-#include "pdb-lang.h"
+#include "pdb-db.h"
 
 int
 main (int argc, char **argv)
@@ -29,9 +29,9 @@ main (int argc, char **argv)
         }
       else
         {
-          PdbLang *lang = pdb_lang_new (revo, &error);
+          PdbDb *db = pdb_db_new (revo, &error);
 
-          if (lang == NULL)
+          if (db == NULL)
             {
               fprintf (stderr, "%s\n", error->message);
               g_clear_error (&error);
@@ -39,7 +39,7 @@ main (int argc, char **argv)
             }
           else
             {
-              pdb_lang_free (lang);
+              pdb_db_free (db);
             }
 
           pdb_revo_free (revo);
