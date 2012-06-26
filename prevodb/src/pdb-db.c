@@ -60,6 +60,8 @@ struct _PdbDb
 
   GHashTable *marks;
   int article_mark_count;
+
+  GString *word_root;
 };
 
 static void
@@ -138,6 +140,52 @@ pdb_db_pop (PdbDb *db)
 }
 
 static void
+pdb_db_skip_start_cb (PdbDb *db,
+                      const char *name,
+                      const char **atts)
+{
+  db->stack->depth++;
+}
+
+static void
+pdb_db_skip_end_cb (PdbDb *db,
+                    const char *name)
+{
+  if (--db->stack->depth == 0)
+    pdb_db_pop (db);
+}
+
+static void
+pdb_db_skip_cd_cb (PdbDb *db,
+                   const char *s,
+                   int len)
+{
+}
+
+static void
+pdb_db_push_skip (PdbDb *db)
+{
+  pdb_db_push (db,
+               pdb_db_skip_start_cb,
+               pdb_db_skip_end_cb,
+               pdb_db_skip_cd_cb);
+}
+
+static void
+pdb_db_root_cd_cb (PdbDb *db,
+                   const char *s,
+                   int len)
+{
+  int pos = db->article_buf->len;
+
+  pdb_db_append_data (db, s, len);
+
+  g_string_append_len (db->word_root,
+                       db->article_buf->str + pos,
+                       db->article_buf->len - pos);
+}
+
+static void
 pdb_db_pop_end_cb (PdbDb *db,
                    const char *name)
 {
@@ -163,6 +211,24 @@ pdb_db_in_article_start_cb (PdbDb *db,
 {
   const char **att;
   const char *tagname;
+
+  if (!strcmp (name, "tld"))
+    {
+      pdb_db_push_skip (db);
+      g_string_append_len (db->article_buf,
+                           db->word_root->str,
+                           db->word_root->len);
+      return;
+    }
+  else if (!strcmp (name, "rad"))
+    {
+      pdb_db_push (db,
+                   pdb_db_skip_start_cb,
+                   pdb_db_skip_end_cb,
+                   pdb_db_root_cd_cb);
+      g_string_set_size (db->word_root, 0);
+      return;
+    }
 
   tagname = "span";
 
@@ -250,6 +316,7 @@ pdb_db_new (PdbRevo *revo,
   db->parser = pdb_xml_parser_new (revo);
   db->error = NULL;
   db->article_buf = g_string_new (NULL);
+  db->word_root = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
   db->next_article = NULL;
   db->stack = NULL;
@@ -284,6 +351,9 @@ pdb_db_new (PdbRevo *revo,
                                        pdb_db_end_element_cb);
           pdb_xml_set_character_data_handler (db->parser,
                                               pdb_db_character_data_cb);
+
+          g_string_set_size (db->word_root, 0);
+          g_string_append_c (db->word_root, '~');
 
           g_string_set_size (db->article_buf, 0);
 
@@ -341,6 +411,7 @@ pdb_db_free (PdbDb *db)
 
   pdb_xml_parser_free (db->parser);
 
+  g_string_free (db->word_root, TRUE);
   g_string_free (db->article_buf, TRUE);
 
   for (i = 0; i < db->articles->len; i++)
