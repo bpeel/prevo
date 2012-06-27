@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "pdb-trie.h"
+#include "pdb-strcmp.h"
 
 /* The format of the compressed trie structure consists of a single
  * trie node where a trie node is a recursive variable length
@@ -70,15 +71,34 @@ pdb_trie_builder_add_word (PdbTrieBuilder *builder,
       if (l == NULL)
         {
           PdbTrieBuilder *child = pdb_trie_builder_new ();
+          GSList *prev = NULL, *l;
+
           child->letter = ch;
           child->article_num = -1;
           child->mark_num = -1;
-          builder->children = g_slist_prepend (builder->children, child);
+
+          /* Find a place to insert this node so the children will
+           * remain sorted */
+          for (l = builder->children; l; l = l->next)
+            {
+              PdbTrieBuilder *sibling = l->data;
+
+              if (pdb_strcmp_ch (ch, sibling->letter) <= 0)
+                break;
+
+              prev = l;
+            }
+
+          if (prev == NULL)
+            builder->children = g_slist_prepend (builder->children, child);
+          else
+            prev->next = g_slist_prepend (prev->next, child);
+
           builder = child;
         }
 
       word = g_utf8_next_char (word);
-    };
+    }
 
   builder->article_num = article_num;
   builder->mark_num = mark_num;

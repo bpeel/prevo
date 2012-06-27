@@ -5,9 +5,9 @@
 #include "pdb-strcmp.h"
 
 static guint32
-pdb_strcmp_get_value (const char *p)
+pdb_strcmp_get_value_ch (gunichar ch)
 {
-  gunichar ch = g_unichar_tolower (g_utf8_get_char (p));
+  ch = g_unichar_tolower (ch);
 
   switch (ch)
     {
@@ -26,6 +26,27 @@ pdb_strcmp_get_value (const char *p)
     default:
       return ch * 2U;
     }
+}
+
+static guint32
+pdb_strcmp_get_value (const char *p)
+{
+  return pdb_strcmp_get_value_ch (g_utf8_get_char (p));
+}
+
+int
+pdb_strcmp_ch (gunichar a,
+               gunichar b)
+{
+  guint32 av = pdb_strcmp_get_value_ch (a);
+  guint32 bv = pdb_strcmp_get_value_ch (b);
+
+  if (av < bv)
+    return -1;
+  else if (av > bv)
+    return 1;
+  else
+    return 0;
 }
 
 /* Compares two strings using Esperanto orthography */
