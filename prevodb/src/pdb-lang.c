@@ -2,6 +2,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include "pdb-lang.h"
 #include "pdb-error.h"
@@ -191,16 +193,83 @@ pdb_lang_free (PdbLang *lang)
   g_slice_free (PdbLang, lang);
 }
 
-gboolean
-pdb_lang_save (PdbLang *lang,
-               const char *dir,
-               GError **error)
+static void
+pdb_lang_write_character_data (const char *str,
+                               FILE *out)
+{
+  while (*str)
+    {
+      if (*str == '&')
+        fputs ("&amp;", out);
+      else if (*str == '<')
+        fputs ("&lt;", out);
+      else if (*str == '>')
+        fputs ("&glt;", out);
+      else if (*str == '"')
+        fputs ("&quot;", out);
+      else
+        fputc (*str, out);
+
+      str++;
+    }
+}
+
+static gboolean
+pdb_lang_save_language_list (PdbLang *lang,
+                             const char *dir,
+                             GError **error)
+{
+  gboolean ret = TRUE;
+  char *filename = g_build_filename (dir, "languages.xml", NULL);
+  FILE *out;
+
+  if ((out = fopen (filename, "w")) == NULL)
+    {
+      g_set_error (error,
+                   G_FILE_ERROR,
+                   g_file_error_from_errno (errno),
+                   "%s: %s",
+                   filename,
+                   strerror (errno));
+      ret = FALSE;
+    }
+  else
+    {
+      int i;
+
+      fputs ("<?xml version=\"1.0\"?>\n"
+             "<languages>\n",
+             out);
+
+      for (i = 0; i < lang->languages->len; i++)
+        {
+          PdbLangEntry *entry =
+            &g_array_index (lang->languages, PdbLangEntry, i);
+
+          fputs ("<lang code=\"", out);
+          pdb_lang_write_character_data (entry->code, out);
+          fputs ("\">", out);
+          pdb_lang_write_character_data (entry->name, out);
+          fputs ("</lang>\n", out);
+        }
+
+      fputs ("</languages>\n", out);
+
+      fclose (out);
+    }
+
+  g_free (filename);
+
+  return ret;
+}
+
+static gboolean
+pdb_lang_save_indices (PdbLang *lang,
+                       const char *dir,
+                       GError **error)
 {
   char *index_dir;
   gboolean ret = TRUE;
-
-  if (!pdb_try_mkdir (dir, error))
-    return FALSE;
 
   index_dir = g_build_filename (dir, "indices", NULL);
 
@@ -244,4 +313,21 @@ pdb_lang_save (PdbLang *lang,
   g_free (index_dir);
 
   return ret;
+}
+
+gboolean
+pdb_lang_save (PdbLang *lang,
+               const char *dir,
+               GError **error)
+{
+  if (!pdb_try_mkdir (dir, error))
+    return FALSE;
+
+  if (!pdb_lang_save_language_list (lang, dir, error))
+    return FALSE;
+
+  if (!pdb_lang_save_indices (lang, dir, error))
+    return FALSE;
+
+  return TRUE;
 }
