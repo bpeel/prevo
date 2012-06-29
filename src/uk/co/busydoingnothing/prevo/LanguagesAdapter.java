@@ -12,10 +12,14 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class LanguagesAdapter extends BaseAdapter
 {
-  private static final String[] mainLanguages =
-  { "esperanto", "angla", "franca" };
+  private static final Language[] mainLanguages =
+  {
+    new Language ("esperanto", "eo"),
+    new Language ("franca", "fr"),
+    new Language ("angla", "en")
+  };
 
-  private String[] allLanguages;
+  private Language[] allLanguages;
 
   private Context context;
 
@@ -29,14 +33,14 @@ public class LanguagesAdapter extends BaseAdapter
     this.allLanguages = getAllLanguages ();
   }
 
-  private String[] getAllLanguages ()
+  private Language[] getAllLanguages ()
   {
     try
       {
         XmlPullParser parser;
         StringBuilder language = new StringBuilder ();
 
-        Vector<String> languages = new Vector<String> ();
+        Vector<Language> languages = new Vector<Language> ();
 
         parser = context.getResources ().getXml (R.xml.languages);
 
@@ -61,7 +65,7 @@ public class LanguagesAdapter extends BaseAdapter
                           language.append (parser.getText ());
                       }
 
-                    languages.add (language.toString ());
+                    languages.add (new Language (language.toString (), code));
                   }
               }
             else if (eventType == XmlPullParser.END_DOCUMENT)
@@ -70,7 +74,7 @@ public class LanguagesAdapter extends BaseAdapter
             parser.next ();
           }
 
-        return languages.toArray (new String[languages.size ()]);
+        return languages.toArray (new Language[languages.size ()]);
       }
     catch (XmlPullParserException e)
       {
