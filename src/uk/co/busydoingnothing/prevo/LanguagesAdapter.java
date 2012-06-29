@@ -237,7 +237,7 @@ public class LanguagesAdapter extends BaseAdapter
         }
       else
         {
-          String filterString = filter.toString ();
+          String filterString = Hats.removeHats (filter);
           Vector<Language> result = new Vector<Language> ();
 
           for (int i = 0; i < allLanguages.length; i++)
