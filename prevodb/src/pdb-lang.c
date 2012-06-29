@@ -220,8 +220,13 @@ pdb_lang_save_language_list (PdbLang *lang,
                              GError **error)
 {
   gboolean ret = TRUE;
-  char *filename = g_build_filename (dir, "languages.xml", NULL);
+  char *filename;
   FILE *out;
+
+  if (!pdb_try_mkdir (error, dir, "res", "xml", NULL))
+    return FALSE;
+
+  filename = g_build_filename (dir, "res", "xml", "languages.xml", NULL);
 
   if ((out = fopen (filename, "w")) == NULL)
     {
@@ -268,12 +273,9 @@ pdb_lang_save_indices (PdbLang *lang,
                        const char *dir,
                        GError **error)
 {
-  char *index_dir;
   gboolean ret = TRUE;
 
-  index_dir = g_build_filename (dir, "indices", NULL);
-
-  if (pdb_try_mkdir (index_dir, error))
+  if (pdb_try_mkdir (error, dir, "assets", "indices", NULL))
     {
       int i;
 
@@ -282,7 +284,8 @@ pdb_lang_save_indices (PdbLang *lang,
           PdbLangEntry *entry =
             &g_array_index (lang->languages, PdbLangEntry, i);
           char *index_name = g_strdup_printf ("index-%s.bin", entry->code);
-          char *full_name = g_build_filename (index_dir, index_name, NULL);
+          char *full_name =
+            g_build_filename (dir, "assets", "indices", index_name, NULL);
           guint8 *compressed_data;
           int compressed_len;
           gboolean write_status;
@@ -310,8 +313,6 @@ pdb_lang_save_indices (PdbLang *lang,
   else
     ret = FALSE;
 
-  g_free (index_dir);
-
   return ret;
 }
 
@@ -320,9 +321,6 @@ pdb_lang_save (PdbLang *lang,
                const char *dir,
                GError **error)
 {
-  if (!pdb_try_mkdir (dir, error))
-    return FALSE;
-
   if (!pdb_lang_save_language_list (lang, dir, error))
     return FALSE;
 

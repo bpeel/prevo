@@ -575,18 +575,12 @@ pdb_db_save (PdbDb *db,
              const char *dir,
              GError **error)
 {
-  char *article_dir;
   gboolean ret = TRUE;
-
-  if (!pdb_try_mkdir (dir, error))
-    return FALSE;
 
   if (!pdb_lang_save (db->lang, dir, error))
     return FALSE;
 
-  article_dir = g_build_filename (dir, "articles", NULL);
-
-  if (pdb_try_mkdir (article_dir, error))
+  if (pdb_try_mkdir (error, dir, "assets", "articles", error))
     {
       int i;
 
@@ -594,7 +588,11 @@ pdb_db_save (PdbDb *db,
         {
           PdbDbArticle *article = g_ptr_array_index (db->articles, i);
           char *article_name = g_strdup_printf ("article-%i.html", i);
-          char *full_name = g_build_filename (article_dir, article_name, NULL);
+          char *full_name = g_build_filename (dir,
+                                              "assets",
+                                              "articles",
+                                              article_name,
+                                              NULL);
           gboolean write_status;
 
           write_status = g_file_set_contents (full_name,
@@ -614,8 +612,6 @@ pdb_db_save (PdbDb *db,
     }
   else
     ret = FALSE;
-
-  g_free (article_dir);
 
   return ret;
 }

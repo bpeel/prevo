@@ -4,7 +4,7 @@
 #include <glib.h>
 
 gboolean
-pdb_try_mkdir (const char *dir,
-               GError **error);
+pdb_try_mkdir (GError **error,
+               ...);
 
 #endif /* PDB_MKDIR_H */
