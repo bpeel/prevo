@@ -5,12 +5,15 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.TextView;
 import java.util.Vector;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 public class LanguagesAdapter extends BaseAdapter
+  implements Filterable
 {
   private static final Language[] mainLanguages =
   {
@@ -22,6 +25,8 @@ public class LanguagesAdapter extends BaseAdapter
   private Language[] allLanguages;
 
   private Context context;
+  private LanguagesFilter filter;
+  private Language[] filteredLanguages;
 
   static final int TYPE_HEADER = 0;
   static final int TYPE_LANGUAGE = 1;
@@ -89,26 +94,36 @@ public class LanguagesAdapter extends BaseAdapter
   @Override
   public int getCount ()
   {
-    return mainLanguages.length + allLanguages.length + 2;
+    if (filteredLanguages == null)
+      return mainLanguages.length + allLanguages.length + 2;
+    else
+      return filteredLanguages.length + 1;
   }
 
   @Override
   public Object getItem (int position)
   {
-    if (position == 0)
-      return "ĈEFAJ LINGVOJ";
+    if (filteredLanguages == null)
+      {
+        if (position == 0)
+          return "ĈEFAJ LINGVOJ";
 
-    position--;
+        position--;
 
-    if (position < mainLanguages.length)
-      return mainLanguages[position];
+        if (position < mainLanguages.length)
+          return mainLanguages[position];
 
-    position -= mainLanguages.length;
+        position -= mainLanguages.length;
 
-    if (position == 0)
+        if (position == 0)
+          return "ĈIUJ LINGVOJ";
+
+        return allLanguages[position - 1];
+      }
+    else if (position == 0)
       return "ĈIUJ LINGVOJ";
-
-    return allLanguages[position - 1];
+    else
+      return filteredLanguages[position - 1];
   }
 
   @Override
@@ -120,7 +135,14 @@ public class LanguagesAdapter extends BaseAdapter
   @Override
   public int getItemViewType (int position)
   {
-    if (position == 0 || position == mainLanguages.length + 1)
+    if (filteredLanguages == null)
+      {
+        if (position == 0 || position == mainLanguages.length + 1)
+          return TYPE_HEADER;
+        else
+          return TYPE_LANGUAGE;
+      }
+    else if (position == 0)
       return TYPE_HEADER;
     else
       return TYPE_LANGUAGE;
@@ -190,5 +212,55 @@ public class LanguagesAdapter extends BaseAdapter
   public boolean areAllItemsEnabled ()
   {
     return false;
+  }
+
+  @Override
+  public LanguagesFilter getFilter ()
+  {
+    if (filter == null)
+      filter = new LanguagesFilter ();
+
+    return filter;
+  }
+
+  private class LanguagesFilter extends Filter
+  {
+    @Override
+    public FilterResults performFiltering (CharSequence filter)
+    {
+      FilterResults ret = new FilterResults ();
+
+      if (filter.length () == 0)
+        {
+          ret.values = null;
+          ret.count = 0;
+        }
+      else
+        {
+          String filterString = filter.toString ();
+          Vector<Language> result = new Vector<Language> ();
+
+          for (int i = 0; i < allLanguages.length; i++)
+            {
+              Language language = allLanguages[i];
+
+              if (language.getName ().startsWith (filterString))
+                result.add (language);
+            }
+
+
+          ret.values = result.toArray (new Language[result.size ()]);
+          ret.count = result.size ();
+        }
+
+      return ret;
+    }
+
+    @Override
+    public void publishResults (CharSequence filter, FilterResults results)
+    {
+      filteredLanguages = (Language[]) results.values;
+      notifyDataSetChanged ();
+    }
   }
 }
