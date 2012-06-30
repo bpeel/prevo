@@ -607,9 +607,10 @@ pdb_db_copy_start_cb (PdbDb *db,
           return;
         }
     }
-  /* Skip citations and adm tags */
+  /* Skip citations, adm tags and pictures */
   else if (!strcmp (name, "fnt") ||
-           !strcmp (name, "adm"))
+           !strcmp (name, "adm") ||
+           !strcmp (name, "bld"))
     {
       pdb_db_push_skip (db);
       return;
