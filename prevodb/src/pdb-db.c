@@ -128,7 +128,7 @@ pdb_db_add_index_entry (PdbDb *db,
                         int article_num,
                         int mark_num)
 {
-  PdbTrieBuilder *trie = pdb_lang_get_trie (db->lang, lang);
+  PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
 
   if (trie)
     {
@@ -156,21 +156,21 @@ pdb_db_add_index_entry (PdbDb *db,
               g_string_append_unichar (buf, ch);
             }
 
-          pdb_trie_builder_add_word (trie,
-                                     buf->str,
-                                     name,
-                                     article_num,
-                                     mark_num);
+          pdb_trie_add_word (trie,
+                             buf->str,
+                             name,
+                             article_num,
+                             mark_num);
 
           g_string_free (buf, TRUE);
         }
       else
         {
-          pdb_trie_builder_add_word (trie,
-                                     name,
-                                     NULL,
-                                     article_num,
-                                     mark_num);
+          pdb_trie_add_word (trie,
+                             name,
+                             NULL,
+                             article_num,
+                             mark_num);
         }
     }
 }

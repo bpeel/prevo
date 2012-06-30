@@ -29,7 +29,7 @@ PdbLang *
 pdb_lang_new (PdbRevo *revo,
               GError **error);
 
-PdbTrieBuilder *
+PdbTrie *
 pdb_lang_get_trie (PdbLang *lang,
                    const char *lang_code);
 

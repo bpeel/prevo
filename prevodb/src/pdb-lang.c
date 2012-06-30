@@ -33,7 +33,7 @@ typedef struct
 {
   char *name;
   char *code;
-  PdbTrieBuilder *trie;
+  PdbTrie *trie;
 } PdbLangEntry;
 
 struct _PdbLang
@@ -94,7 +94,7 @@ pdb_lang_end_element_cb (void *user_data,
                           lang->languages->len - 1);
   entry->name = g_strdup (lang->name_buf->str);
   entry->code = g_strdup (lang->code_buf->str);
-  entry->trie = pdb_trie_builder_new ();
+  entry->trie = pdb_trie_new ();
 }
 
 static int
@@ -177,7 +177,7 @@ pdb_lang_new (PdbRevo *revo,
   return lang;
 }
 
-PdbTrieBuilder *
+PdbTrie *
 pdb_lang_get_trie (PdbLang *lang,
                    const char *lang_code)
 {
@@ -195,7 +195,7 @@ pdb_lang_free (PdbLang *lang)
 
       g_free (entry->name);
       g_free (entry->code);
-      pdb_trie_builder_free (entry->trie);
+      pdb_trie_free (entry->trie);
     }
 
   g_array_free (lang->languages, TRUE);
@@ -268,7 +268,7 @@ pdb_lang_save_language_list (PdbLang *lang,
           PdbLangEntry *entry =
             &g_array_index (lang->languages, PdbLangEntry, i);
 
-          if (!pdb_trie_builder_is_empty (entry->trie))
+          if (!pdb_trie_is_empty (entry->trie))
             {
               fputs ("<lang code=\"", out);
               pdb_lang_write_character_data (entry->code, out);
@@ -304,7 +304,7 @@ pdb_lang_save_indices (PdbLang *lang,
           PdbLangEntry *entry =
             &g_array_index (lang->languages, PdbLangEntry, i);
 
-          if (!pdb_trie_builder_is_empty (entry->trie))
+          if (!pdb_trie_is_empty (entry->trie))
             {
               char *index_name = g_strdup_printf ("index-%s.bin", entry->code);
               char *full_name =
@@ -313,9 +313,9 @@ pdb_lang_save_indices (PdbLang *lang,
               int compressed_len;
               gboolean write_status;
 
-              pdb_trie_builder_compress (entry->trie,
-                                         &compressed_data,
-                                         &compressed_len);
+              pdb_trie_compress (entry->trie,
+                                 &compressed_data,
+                                 &compressed_len);
 
               write_status = g_file_set_contents (full_name,
                                                   (char *) compressed_data,

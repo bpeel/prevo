@@ -20,27 +20,27 @@
 
 #include <glib.h>
 
-typedef struct _PdbTrieBuilder PdbTrieBuilder;
+typedef struct _PdbTrie PdbTrie;
 
-PdbTrieBuilder *
-pdb_trie_builder_new (void);
-
-void
-pdb_trie_builder_add_word (PdbTrieBuilder *builder,
-                           const char *word,
-                           const char *display_representation,
-                           int article_num,
-                           int mark_num);
+PdbTrie *
+pdb_trie_new (void);
 
 void
-pdb_trie_builder_compress (PdbTrieBuilder *builder,
-                           guint8 **data,
-                           int *len);
+pdb_trie_add_word (PdbTrie *trie,
+                   const char *word,
+                   const char *display_representation,
+                   int article_num,
+                   int mark_num);
 
 void
-pdb_trie_builder_free (PdbTrieBuilder *builder);
+pdb_trie_compress (PdbTrie *trie,
+                   guint8 **data,
+                   int *len);
+
+void
+pdb_trie_free (PdbTrie *trie);
 
 gboolean
-pdb_trie_builder_is_empty (PdbTrieBuilder *builder);
+pdb_trie_is_empty (PdbTrie *trie);
 
 #endif /* PDB_TRIE_H */
