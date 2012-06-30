@@ -29,4 +29,10 @@ public class SearchResult
   {
     return mark;
   }
+
+  @Override
+  public String toString ()
+  {
+    return word;
+  }
 }
