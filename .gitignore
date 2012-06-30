@@ -22,5 +22,9 @@
 /prevodb/src/dump-index
 /prevodb/stamp-h1
 
+/assets/articles/article-*.xml
+/assets/indices/index-*.bin
+/res/xml/languages.xml
+
 .deps
 *.o
