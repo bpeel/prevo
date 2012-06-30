@@ -7,7 +7,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 
-public class LanguageActivity extends ListActivity
+public class LanguagesActivity extends ListActivity
 {
   @Override
   public void onCreate (Bundle savedInstanceState)
