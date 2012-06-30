@@ -130,7 +130,48 @@ pdb_db_add_index_entry (PdbDb *db,
   PdbTrieBuilder *trie = pdb_lang_get_trie (db->lang, lang);
 
   if (trie)
-    pdb_trie_builder_add_word (trie, name, article_num, mark_num);
+    {
+      const char *p;
+
+      /* Check if any of the characters in the name are upper case */
+      for (p = name; *p; p = g_utf8_next_char (p))
+        {
+          gunichar ch = g_utf8_get_char (p);
+
+          if (g_unichar_isupper (ch))
+            break;
+        }
+
+      /* If we found an uppercase character then we'll additionally
+       * add a lower case representation of the name so that the
+       * search can be case insensitive */
+      if (*p)
+        {
+          GString *buf = g_string_new (NULL);
+
+          for (p = name; *p; p = g_utf8_next_char (p))
+            {
+              gunichar ch = g_unichar_tolower (g_utf8_get_char (p));
+              g_string_append_unichar (buf, ch);
+            }
+
+          pdb_trie_builder_add_word (trie,
+                                     buf->str,
+                                     name,
+                                     article_num,
+                                     mark_num);
+
+          g_string_free (buf, TRUE);
+        }
+      else
+        {
+          pdb_trie_builder_add_word (trie,
+                                     name,
+                                     NULL,
+                                     article_num,
+                                     mark_num);
+        }
+    }
 }
 
 static void

@@ -27,7 +27,8 @@ pdb_trie_builder_new (void);
 
 void
 pdb_trie_builder_add_word (PdbTrieBuilder *builder,
-                           const gchar *word,
+                           const char *word,
+                           const char *display_representation,
                            int article_num,
                            int mark_num);
 

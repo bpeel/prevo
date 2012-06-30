@@ -32,19 +32,42 @@
  *   node (including this node).
  * • 1-6 bytes of UTF-8 encoding data to represent the character of
  *   this node.
- * If the most significant bit of the offset is set then the word is a
- * valid entry and will be followed by three bytes:
+ *
+ * If bit 31 of the offset is set then the word is a valid entry and
+ * will be followed by a list of article and mark numbers:
+ *
  *  • Two bytes representing the article number in little endian.
  *  • One byte representing the mark number.
+ *
+ * And two most significant bits of the article number have a special
+ * meaning:
+ *
+ *  Bit 15: If this is set then there is a subsequent article after
+ *          this one matching this index name. Otherwise this article
+ *          represents the end of the list.
+ *  Bit 14: If this is set then this entry has a different display
+ *          name from its name in the trie. In that case immediately
+ *          following these three bytes will be a single byte
+ *          representing the length of the display in bytes, followed
+ *          by the name itself.
+ *
  * Following that there is a list of child nodes of this node.
  */
 
-struct _PdbTrieBuilder
+typedef struct
 {
   int article_num;
   int mark_num;
-  gunichar letter;
+  /* This will be NULL unless the display name for this article is
+   * different from the string to search for stored in the trie */
+  char *display_word;
+} PdbTrieBuilderArticle;
+
+struct _PdbTrieBuilder
+{
+  GSList *articles;
   GSList *children;
+  gunichar letter;
 };
 
 PdbTrieBuilder *
@@ -52,10 +75,9 @@ pdb_trie_builder_new (void)
 {
   PdbTrieBuilder *root = g_slice_new (PdbTrieBuilder);
 
-  root->article_num = -1;
-  root->mark_num = -1;
   root->letter = '['; /* This isn't used anywhere. [ is the next
                          character after Z */
+  root->articles = NULL;
   root->children = NULL;
 
   return root;
@@ -64,9 +86,12 @@ pdb_trie_builder_new (void)
 void
 pdb_trie_builder_add_word (PdbTrieBuilder *builder,
                            const char *word,
+                           const char *display_word,
                            int article_num,
                            int mark_num)
 {
+  PdbTrieBuilderArticle *article;
+
   while (*word)
     {
       GSList *l;
@@ -91,8 +116,6 @@ pdb_trie_builder_add_word (PdbTrieBuilder *builder,
           GSList *prev = NULL, *l;
 
           child->letter = ch;
-          child->article_num = -1;
-          child->mark_num = -1;
 
           /* Find a place to insert this node so the children will
            * remain sorted */
@@ -117,8 +140,14 @@ pdb_trie_builder_add_word (PdbTrieBuilder *builder,
       word = g_utf8_next_char (word);
     }
 
-  builder->article_num = article_num;
-  builder->mark_num = mark_num;
+  article = g_slice_new (PdbTrieBuilderArticle);
+  article->article_num = article_num;
+  article->mark_num = mark_num;
+  if (display_word)
+    article->display_word = g_strdup (display_word);
+  else
+    article->display_word = NULL;
+  builder->articles = g_slist_prepend (builder->articles, article);
 }
 
 static void
@@ -139,15 +168,33 @@ pdb_trie_builder_compress_node (PdbTrieBuilder *builder,
                                      (char *) data->data + data->len - 6);
   g_byte_array_set_size (data, data->len - 6 + character_len);
 
-  /* Optionally add the article and mark number */
-  if (builder->article_num >= 0)
+  /* Optionally add the articles */
+  for (l = builder->articles; l; l = l->next)
     {
-      guint16 article_num = GUINT16_TO_LE ((guint16) builder->article_num);
-      guint8 mark_num = builder->mark_num;
+      PdbTrieBuilderArticle *article = l->data;
+      guint16 article_num = article->article_num;
+      guint8 mark_num = article->mark_num;
+
+      if (l->next != NULL)
+        article_num |= 0x8000;
+      if (article->display_word)
+        article_num |= 0x4000;
+
+      article_num = GUINT16_TO_LE (article_num);
 
       g_byte_array_set_size (data, data->len + 3);
       memcpy (data->data + data->len - 3, &article_num, 2);
       memcpy (data->data + data->len - 1, &mark_num, 1);
+
+      if (article->display_word)
+        {
+          int len = strlen (article->display_word);
+          g_byte_array_set_size (data, data->len + 1 + len);
+          data->data[data->len - len - 1] = len;
+          memcpy (data->data + data->len - len,
+                  article->display_word,
+                  len);
+        }
     }
 
   /* Add all of the child nodes */
@@ -156,7 +203,7 @@ pdb_trie_builder_compress_node (PdbTrieBuilder *builder,
 
   /* Write the offset */
   offset = data->len - node_start;
-  if (builder->article_num >= 0)
+  if (builder->articles)
     offset |= 1 << (guint32) 31;
   offset = GUINT32_TO_LE (offset);
 
@@ -178,10 +225,23 @@ pdb_trie_builder_compress (PdbTrieBuilder *builder,
   g_byte_array_free (data_buf, FALSE);
 }
 
+static void
+pdb_trie_builder_article_free (PdbTrieBuilderArticle *article)
+{
+  g_free (article->display_word);
+  g_slice_free (PdbTrieBuilderArticle, article);
+}
+
 void
 pdb_trie_builder_free (PdbTrieBuilder *builder)
 {
   g_slist_foreach (builder->children, (GFunc) pdb_trie_builder_free, NULL);
   g_slist_free (builder->children);
+
+  g_slist_foreach (builder->articles,
+                   (GFunc) pdb_trie_builder_article_free,
+                   NULL);
+  g_slist_free (builder->articles);
+
   g_slice_free (PdbTrieBuilder, builder);
 }

@@ -197,11 +197,23 @@ public class Trie
         childStart += getUtf8Length (data[childStart]);
 
         /* If the high bit in the offset is set then it is followed by
-         * the article and mark number which we want to skip */
+         * the matching articles which we want to skip */
         if (offset < 0)
           {
             offset &= 0x7fffffff;
-            childStart += 3;
+
+            boolean hasNext;
+
+            do
+              {
+                hasNext = (data[childStart + 1] & 0x80) != 0;
+                boolean hasDisplayName = (data[childStart + 1] & 0x40) != 0;
+
+                childStart += 3;
+
+                if (hasDisplayName)
+                  childStart += (data[childStart] & 0xff) + 1;
+              } while (hasNext);
           }
 
         int trieEnd = trieStart + offset;
@@ -276,15 +288,38 @@ public class Trie
         /* If this is a complete word then add it to the results */
         if (offset < 0)
           {
-            int article = ((data[childrenStart] & 0xff) |
-                           ((data[childrenStart + 1] & 0xff) << 8));
-            int mark = data[childrenStart + 2] & 0xff;
+            boolean hasNext = true;
 
-            results[numResults++] = new SearchResult (stringBuf.toString (),
-                                                      article,
-                                                      mark);
+            while (hasNext && numResults < results.length)
+              {
+                int article = ((data[childrenStart] & 0xff) |
+                               ((data[childrenStart + 1] & 0xff) << 8));
+                int mark = data[childrenStart + 2] & 0xff;
+                hasNext = (article & 0x8000) != 0;
+                boolean hasDisplayName = (article & 0x4000) != 0;
 
-            childrenStart += 3;
+                childrenStart += 3;
+
+                article &= 0x3fff;
+
+                String word;
+                if (hasDisplayName)
+                  {
+                    int len = data[childrenStart] & 0xff;
+                    word = new String (data,
+                                       childrenStart + 1,
+                                       len,
+                                       utf8Charset);
+                    childrenStart += len + 1;
+                  }
+                else
+                  word = stringBuf.toString ();
+
+                results[numResults++] = new SearchResult (word,
+                                                          article,
+                                                          mark);
+              }
+
             offset &= 0x7fffffff;
           }
 

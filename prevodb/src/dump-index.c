@@ -71,9 +71,10 @@ dump_trie (const guint8 *trie_data,
   trie_length -= ch_end - trie_data;
   trie_data = ch_end;
 
-  if (is_word)
+  while (is_word)
     {
       int article_num, mark_num;
+      gboolean has_display_name;
 
       if (trie_length < 3)
         {
@@ -84,10 +85,37 @@ dump_trie (const guint8 *trie_data,
       article_num = trie_data[0] | ((int) trie_data[1] << 8);
       mark_num = trie_data[2];
 
+      is_word = !!(article_num & 0x8000);
+      has_display_name = !!(article_num & 0x4000);
+
       trie_data += 3;
       trie_length -= 3;
 
-      printf ("%s %i %i\n", buf->str + 1, article_num, mark_num);
+      printf ("%s ", buf->str + 1);
+
+      if (has_display_name)
+        {
+          int len;
+
+          if (trie_length < 1 ||
+              trie_length < 1 + (len = trie_data[0]))
+            {
+              fprintf (stderr, "Unexpected end of trie\n");
+              return FALSE;
+            }
+
+          fputc ('(', stdout);
+          fwrite (trie_data + 1, 1, len, stdout);
+          fputs (") ", stdout);
+
+          trie_length -= len + 1;
+          trie_data += len + 1;
+        }
+
+      printf ("%i %i\n", article_num, mark_num);
+
+      if (is_word)
+        printf ("+ ");
     }
 
   while (trie_length > 0)
