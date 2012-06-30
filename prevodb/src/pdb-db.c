@@ -18,6 +18,8 @@
 #include "config.h"
 
 #include <string.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include "pdb-db.h"
 #include "pdb-lang.h"
@@ -27,8 +29,25 @@
 
 typedef struct
 {
+  /* An offset into the article buffer where the resolved reference
+   * should be stored */
+  int offset;
+  /* The original name of the reference */
+  char *name;
+} PdbDbReference;
+
+typedef struct
+{
   int length;
   char *text;
+
+  /* This is a list of references. Each reference contains the
+   * original reference id from the XML file and an offset into the
+   * article buffer. These will replaced by an article and mark number
+   * as a post-processing step once all of the articles have been read
+   * so that the references can be resolved. The references are sorted
+   * by the offset */
+  GList *references;
 } PdbDbArticle;
 
 typedef struct
@@ -87,6 +106,8 @@ struct _PdbDb
   GError *error;
 
   PdbLang *lang;
+
+  GQueue references;
 
   GString *article_buf;
 
@@ -353,6 +374,19 @@ pdb_db_copy_start_cb (PdbDb *db,
                                   " mrk=\"%i\"",
                                   mark);
         }
+      else if (!strcmp (att[0], "cel"))
+        {
+          PdbDbReference *ref = g_slice_new (PdbDbReference);
+
+          g_string_append (db->article_buf, " cel=\"\"");
+
+          /* Queue the reference for later so we can replace with an
+           * article and mark number later when all of the articles
+           * are available. */
+          ref->offset = db->article_buf->len - 1;
+          ref->name = g_strdup (att[1]);
+          g_queue_push_tail (&db->references, ref);
+        }
       else
         {
           g_string_append_c (db->article_buf, ' ');
@@ -460,6 +494,7 @@ pdb_db_new (PdbRevo *revo,
   db->kap_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
   db->stack = NULL;
+  g_queue_init (&db->references);
 
   db->marks = g_hash_table_new_full (g_str_hash,
                                      g_str_equal,
@@ -521,6 +556,8 @@ pdb_db_new (PdbRevo *revo,
               article->text = g_memdup (db->article_buf->str,
                                         db->article_buf->len + 1);
               article->length = db->article_buf->len;
+              article->references = db->references.head;
+              g_queue_init (&db->references);
 
               g_ptr_array_add (db->articles, article);
             }
@@ -537,6 +574,23 @@ pdb_db_new (PdbRevo *revo,
     }
 
   return db;
+}
+
+static void
+pdb_db_free_reference_cb (void *ptr,
+                          void *user_data)
+{
+  PdbDbReference *ref = ptr;
+
+  g_free (ref->name);
+  g_slice_free (PdbDbReference, ref);
+}
+
+static void
+pdb_db_free_reference_list (GList *references)
+{
+  g_list_foreach (references, pdb_db_free_reference_cb, NULL);
+  g_list_free (references);
 }
 
 void
@@ -556,14 +610,63 @@ pdb_db_free (PdbDb *db)
     {
       PdbDbArticle *article = g_ptr_array_index (db->articles, i);
 
+      pdb_db_free_reference_list (article->references);
+
       g_free (article->text);
     }
+
+  pdb_db_free_reference_list (db->references.head);
 
   g_ptr_array_free (db->articles, TRUE);
 
   g_hash_table_destroy (db->marks);
 
   g_slice_free (PdbDb, db);
+}
+
+static gboolean
+pdb_db_save_article (PdbDb *db,
+                     PdbDbArticle *article,
+                     FILE *out,
+                     GError **error)
+{
+  int last_pos = 0;
+  GList *l;
+
+  for (l = article->references; l; l = l->next)
+    {
+      PdbDbReference *ref = l->data;
+      PdbDbMark *mark;
+
+      if (fwrite (article->text + last_pos, 1, ref->offset - last_pos, out) !=
+          ref->offset - last_pos)
+        {
+          g_set_error (error,
+                       G_FILE_ERROR,
+                       g_file_error_from_errno (errno),
+                       "%s",
+                       strerror (errno));
+          return FALSE;
+        }
+
+      if ((mark = g_hash_table_lookup (db->marks, ref->name)))
+        fprintf (out, "%i:%i", mark->article_num, mark->mark_num);
+
+      last_pos = ref->offset;
+    }
+
+  if (fwrite (article->text + last_pos, 1, article->length - last_pos, out) !=
+      article->length - last_pos)
+    {
+      g_set_error (error,
+                   G_FILE_ERROR,
+                   g_file_error_from_errno (errno),
+                   "%s",
+                   strerror (errno));
+      return FALSE;
+    }
+
+  return TRUE;
 }
 
 gboolean
@@ -589,20 +692,34 @@ pdb_db_save (PdbDb *db,
                                               "articles",
                                               article_name,
                                               NULL);
-          gboolean write_status;
+          gboolean write_status = TRUE;
+          FILE *out;
 
-          write_status = g_file_set_contents (full_name,
-                                              article->text,
-                                              article->length,
-                                              error);
+          out = fopen (full_name, "w");
+
+          if (out == NULL)
+            {
+              g_set_error (error,
+                           G_FILE_ERROR,
+                           g_file_error_from_errno (errno),
+                           "%s: %s",
+                           full_name,
+                           strerror (errno));
+              write_status = FALSE;
+            }
+          else
+            {
+              write_status = pdb_db_save_article (db, article, out, error);
+              fclose (out);
+            }
 
           g_free (full_name);
           g_free (article_name);
 
           if (!write_status)
             {
-              break;
               ret = FALSE;
+              break;
             }
         }
     }
