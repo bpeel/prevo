@@ -36,5 +36,7 @@
     <activity a:name="SearchActivity"
               a:label="@string/search">
     </activity>
+    <activity a:name="ArticleActivity">
+    </activity>
   </application>
 </manifest>
