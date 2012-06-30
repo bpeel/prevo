@@ -117,7 +117,7 @@ struct _PdbDb
   int article_mark_count;
 
   GString *word_root;
-  GString *kap_buf;
+  GString *tmp_buf;
 };
 
 static void
@@ -325,9 +325,28 @@ pdb_db_kap_start_cb (PdbDb *db,
                      const char **atts)
 {
   if (!strcmp (name, "tld"))
-    pdb_db_append_tld (db, db->kap_buf, atts);
+    pdb_db_append_tld (db, db->tmp_buf, atts);
 
   pdb_db_copy_start_cb (db, name, atts);
+}
+
+static const char *
+pdb_db_trim_buf (GString *buf)
+{
+  const char *start;
+  char *end;
+
+  /* Strip trailing spaces from the tmp_buf */
+  for (end = buf->str + buf->len;
+       end > buf->str && g_ascii_isspace (end[-1]);
+       end--);
+  *end = '\0';
+  /* And leading spaces */
+  for (start = buf->str;
+       start < end && g_ascii_isspace (*start);
+       start++);
+
+  return start;
 }
 
 static void
@@ -341,18 +360,7 @@ pdb_db_kap_end_cb (PdbDb *db,
                    "Headword found with no containing mrk");
   else
     {
-      int end;
-      const char *start;
-
-      /* Strip trailing spaces from the kap_buf */
-      for (end = db->kap_buf->len;
-           end > 0 && g_ascii_isspace (db->kap_buf->str[end]);
-           end--);
-      db->kap_buf->str[end] = '\0';
-      /* And leading spaces */
-      for (start = db->kap_buf->str;
-           *start && g_ascii_isspace (*start);
-           start++);
+      const char *start = pdb_db_trim_buf (db->tmp_buf);
 
       pdb_db_add_index_entry (db,
                               "eo",
@@ -374,9 +382,168 @@ pdb_db_kap_cd_cb (PdbDb *db,
 
   pdb_db_append_data (db, s, len);
 
-  g_string_append_len (db->kap_buf,
+  g_string_append_len (db->tmp_buf,
                        db->article_buf->str + pos,
                        db->article_buf->len - pos);
+}
+
+static void
+pdb_db_translation_start_cb (PdbDb *db,
+                             const char *name,
+                             const char **atts)
+{
+  db->stack->depth++;
+}
+
+static void
+pdb_db_translation_end_cb (PdbDb *db,
+                           const char *name)
+{
+  if (--db->stack->depth <= 0)
+    {
+      pdb_db_append_data (db, db->tmp_buf->str, db->tmp_buf->len);
+      g_string_append (db->article_buf, "</trd>");
+
+      if (db->stack->data)
+        {
+          char *lang = db->stack->data;
+          const char *name;
+
+          name = pdb_db_trim_buf (db->tmp_buf);
+
+          pdb_db_add_index_entry (db,
+                                  lang,
+                                  name,
+                                  db->articles->len,
+                                  db->stack->mark);
+
+          g_free (lang);
+        }
+
+      pdb_db_pop (db);
+    }
+}
+
+static void
+pdb_db_translation_cd_cb (PdbDb *db,
+                          const char *s,
+                          int len)
+{
+  g_string_append_len (db->tmp_buf, s, len);
+}
+
+static void
+pdb_db_handle_translation (PdbDb *db,
+                           const char **atts)
+{
+  const char **att;
+  const char *lang = NULL;
+
+  g_string_set_size (db->tmp_buf, 0);
+
+  for (att = atts; att[0]; att += 2)
+    if (!strcmp (att[0], "lng"))
+      {
+        lang = att[1];
+        break;
+      }
+
+  pdb_db_push (db,
+               pdb_db_translation_start_cb,
+               pdb_db_translation_end_cb,
+               pdb_db_translation_cd_cb);
+
+  if (lang == NULL)
+    pdb_xml_abort (db->parser,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "<trd> tag found with no lng attribute");
+  else
+    {
+      db->stack->data = g_strdup (lang);
+
+      g_string_append (db->article_buf, "<trd lang=\"");
+      pdb_db_append_data (db, lang, strlen (lang));
+      g_string_append (db->article_buf, "\">");
+    }
+}
+
+static void
+pdb_db_translation_group_start_cb (PdbDb *db,
+                                   const char *name,
+                                   const char **atts)
+{
+  if (!strcmp (name, "trd"))
+    {
+      const char *lang = db->stack->data;
+
+      g_string_set_size (db->tmp_buf, 0);
+
+      pdb_db_push (db,
+                   pdb_db_translation_start_cb,
+                   pdb_db_translation_end_cb,
+                   pdb_db_translation_cd_cb);
+
+      db->stack->data = g_strdup (lang);
+
+      g_string_append (db->article_buf, "<trd>");
+    }
+  else
+    db->stack->depth++;
+}
+
+static void
+pdb_db_translation_group_end_cb (PdbDb *db,
+                                 const char *name)
+{
+  if (--db->stack->depth <= 0)
+    {
+      g_string_append (db->article_buf, "</trdgrp>");
+      g_free (db->stack->data);
+      pdb_db_pop (db);
+    }
+}
+
+static void
+pdb_db_translation_group_cd_cb (PdbDb *db,
+                                const char *s,
+                                int len)
+{
+  pdb_db_append_data (db, s, len);
+}
+
+static void
+pdb_db_handle_translation_group (PdbDb *db,
+                                 const char **atts)
+{
+  const char **att;
+  const char *lang = NULL;
+
+  for (att = atts; att[0]; att += 2)
+    if (!strcmp (att[0], "lng"))
+      {
+        lang = att[1];
+        break;
+      }
+
+  pdb_db_push (db,
+               pdb_db_translation_group_start_cb,
+               pdb_db_translation_group_end_cb,
+               pdb_db_translation_group_cd_cb);
+
+  if (lang == NULL)
+    pdb_xml_abort (db->parser,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "<trdgrp> tag found with no lng attribute");
+  else
+    {
+      db->stack->data = g_strdup (lang);
+
+      g_string_append (db->article_buf, "<trdgrp lang=\"");
+      pdb_db_append_data (db, lang, strlen (lang));
+      g_string_append (db->article_buf, "\">");
+    }
 }
 
 static void
@@ -413,7 +580,7 @@ pdb_db_copy_start_cb (PdbDb *db,
         {
           g_string_append (db->article_buf,
                            "<kap>");
-          g_string_set_size (db->kap_buf, 0);
+          g_string_set_size (db->tmp_buf, 0);
           pdb_db_push (db,
                        pdb_db_kap_start_cb,
                        pdb_db_kap_end_cb,
@@ -426,6 +593,16 @@ pdb_db_copy_start_cb (PdbDb *db,
            !strcmp (name, "adm"))
     {
       pdb_db_push_skip (db);
+      return;
+    }
+  else if (!strcmp (name, "trd"))
+    {
+      pdb_db_handle_translation (db, atts);
+      return;
+    }
+  else if (!strcmp (name, "trdgrp"))
+    {
+      pdb_db_handle_translation_group (db, atts);
       return;
     }
 
@@ -559,7 +736,7 @@ pdb_db_new (PdbRevo *revo,
   db->error = NULL;
   db->article_buf = g_string_new (NULL);
   db->word_root = g_string_new (NULL);
-  db->kap_buf = g_string_new (NULL);
+  db->tmp_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
   db->stack = NULL;
   g_queue_init (&db->references);
@@ -671,7 +848,7 @@ pdb_db_free (PdbDb *db)
   pdb_xml_parser_free (db->parser);
 
   g_string_free (db->word_root, TRUE);
-  g_string_free (db->kap_buf, TRUE);
+  g_string_free (db->tmp_buf, TRUE);
   g_string_free (db->article_buf, TRUE);
 
   for (i = 0; i < db->articles->len; i++)
