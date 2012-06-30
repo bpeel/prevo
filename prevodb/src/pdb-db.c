@@ -298,14 +298,34 @@ pdb_db_root_cd_cb (PdbDb *db,
 }
 
 static void
+pdb_db_append_tld (PdbDb *db,
+                   GString *buf,
+                   const char **atts)
+{
+  const char *root = db->word_root->str;
+  const char **att;
+
+  for (att = atts; att[0]; att += 2)
+    if (!strcmp (att[0], "lit"))
+      {
+        g_string_append (buf, att[1]);
+
+        if (*root)
+          root = g_utf8_next_char (root);
+
+        break;
+      }
+
+  g_string_append (buf, root);
+}
+
+static void
 pdb_db_kap_start_cb (PdbDb *db,
                      const char *name,
                      const char **atts)
 {
   if (!strcmp (name, "tld"))
-    g_string_append_len (db->kap_buf,
-                         db->word_root->str,
-                         db->word_root->len);
+    pdb_db_append_tld (db, db->kap_buf, atts);
 
   pdb_db_copy_start_cb (db, name, atts);
 }
@@ -380,7 +400,7 @@ pdb_db_copy_start_cb (PdbDb *db,
   else if (!strcmp (name, "tld"))
     {
       pdb_db_push_skip (db);
-      pdb_db_append_data (db, db->word_root->str, db->word_root->len);
+      pdb_db_append_tld (db, db->article_buf, atts);
       return;
     }
   else if (!strcmp (name, "drv"))
