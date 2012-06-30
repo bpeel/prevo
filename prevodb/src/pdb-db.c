@@ -421,6 +421,13 @@ pdb_db_copy_start_cb (PdbDb *db,
           return;
         }
     }
+  /* Skip citations and adm tags */
+  else if (!strcmp (name, "fnt") ||
+           !strcmp (name, "adm"))
+    {
+      pdb_db_push_skip (db);
+      return;
+    }
 
   g_string_append_c (db->article_buf, '<');
   g_string_append (db->article_buf, name);
