@@ -68,6 +68,7 @@ typedef void (* PdbDbCharacterDataHandler) (PdbDb *db,
                                             int len);
 
 #define PDB_DB_FLAG_IN_DRV (1 << 0)
+#define PDB_DB_FLAG_IN_EKZ (1 << 1)
 
 static void
 pdb_db_copy_start_cb (PdbDb *db,
@@ -439,6 +440,13 @@ pdb_db_handle_translation (PdbDb *db,
   const char **att;
   const char *lang = NULL;
 
+  /* Ignore translations of examples */
+  if ((db->stack->flags & PDB_DB_FLAG_IN_EKZ))
+    {
+      pdb_db_push_skip (db);
+      return;
+    }
+
   g_string_set_size (db->tmp_buf, 0);
 
   for (att = atts; att[0]; att += 2)
@@ -519,6 +527,13 @@ pdb_db_handle_translation_group (PdbDb *db,
   const char **att;
   const char *lang = NULL;
 
+  /* Ignore translations of examples */
+  if ((db->stack->flags & PDB_DB_FLAG_IN_EKZ))
+    {
+      pdb_db_push_skip (db);
+      return;
+    }
+
   for (att = atts; att[0]; att += 2)
     if (!strcmp (att[0], "lng"))
       {
@@ -573,6 +588,10 @@ pdb_db_copy_start_cb (PdbDb *db,
   else if (!strcmp (name, "drv"))
     {
       flags |= PDB_DB_FLAG_IN_DRV;
+    }
+  else if (!strcmp (name, "ekz"))
+    {
+      flags |= PDB_DB_FLAG_IN_EKZ;
     }
   else if (!strcmp (name, "kap"))
     {
