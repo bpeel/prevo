@@ -33,7 +33,7 @@ typedef struct
 
 typedef struct
 {
-  PdbDbArticle *article;
+  int article_num;
   int mark_num;
 } PdbDbMark;
 
@@ -51,14 +51,18 @@ typedef void (* PdbDbCharacterDataHandler) (PdbDb *db,
 #define PDB_DB_FLAG_IN_DRV (1 << 0)
 
 static void
-pdb_db_handle_article_tag (PdbDb *db,
-                           const char *name,
-                           const char **atts);
+pdb_db_copy_start_cb (PdbDb *db,
+                      const char *name,
+                      const char **atts);
 
 static void
-pdb_db_in_article_start_cb (PdbDb *db,
-                            const char *name,
-                            const char **atts);
+pdb_db_copy_end_cb (PdbDb *db,
+                    const char *name);
+
+static void
+pdb_db_copy_cd_cb (PdbDb *db,
+                   const char *s,
+                   int len);
 
 struct _PdbDbStackEntry
 {
@@ -87,8 +91,6 @@ struct _PdbDb
   GString *article_buf;
 
   GPtrArray *articles;
-
-  PdbDbArticle *next_article;
 
   GHashTable *marks;
   int article_mark_count;
@@ -145,12 +147,12 @@ pdb_db_append_data (PdbDb *db,
 static void
 pdb_db_add_mark (PdbDb *db,
                  const char *mark_name,
-                 PdbDbArticle *article,
+                 int article_num,
                  int mark_num)
 {
   PdbDbMark *mark = g_slice_new (PdbDbMark);
 
-  mark->article = article;
+  mark->article_num = article_num;
   mark->mark_num = mark_num;
 
   g_hash_table_insert (db->marks,
@@ -234,26 +236,6 @@ pdb_db_root_cd_cb (PdbDb *db,
 }
 
 static void
-pdb_db_pop_end_cb (PdbDb *db,
-                   const char *name)
-{
-  if (db->stack->data)
-    g_string_append_printf (db->article_buf,
-                            "</%s>",
-                            (char *) db->stack->data);
-
-  pdb_db_pop (db);
-}
-
-static void
-pdb_db_append_cd_cb (PdbDb *db,
-                     const char *s,
-                     int len)
-{
-  pdb_db_append_data (db, s, len);
-}
-
-static void
 pdb_db_kap_start_cb (PdbDb *db,
                      const char *name,
                      const char **atts)
@@ -263,7 +245,7 @@ pdb_db_kap_start_cb (PdbDb *db,
                          db->word_root->str,
                          db->word_root->len);
 
-  pdb_db_handle_article_tag (db, name, atts);
+  pdb_db_copy_start_cb (db, name, atts);
 }
 
 static void
@@ -295,7 +277,7 @@ pdb_db_kap_end_cb (PdbDb *db,
                               start,
                               db->articles->len,
                               db->stack->mark);
-      g_string_append (db->article_buf, "</div>");
+      g_string_append (db->article_buf, "</kap>");
     }
 
   pdb_db_pop (db);
@@ -316,25 +298,15 @@ pdb_db_kap_cd_cb (PdbDb *db,
 }
 
 static void
-pdb_db_handle_article_tag (PdbDb *db,
-                           const char *name,
-                           const char **atts)
+pdb_db_copy_start_cb (PdbDb *db,
+                      const char *name,
+                      const char **atts)
 {
+  int mark = -1;
+  int flags = 0;
   const char **att;
-  const char *tagname = NULL;
-  const char *klass = NULL;
-  const char *mark = NULL;
-  int flags = db->stack->flags;
 
-  if (!strcmp (name, "tld"))
-    {
-      pdb_db_push_skip (db);
-      g_string_append_len (db->article_buf,
-                           db->word_root->str,
-                           db->word_root->len);
-      return;
-    }
-  else if (!strcmp (name, "rad"))
+  if (!strcmp (name, "rad"))
     {
       pdb_db_push (db,
                    pdb_db_skip_start_cb,
@@ -343,35 +315,22 @@ pdb_db_handle_article_tag (PdbDb *db,
       g_string_set_size (db->word_root, 0);
       return;
     }
-  else if (!strcmp (name, "fnt") ||
-           !strcmp (name, "adm"))
+  else if (!strcmp (name, "tld"))
     {
       pdb_db_push_skip (db);
-      return;
-    }
-  else if (!strcmp (name, "trd") || !strcmp (name, "trdgrp"))
-    {
-      /* TODO: queue translations for later */
-      pdb_db_push_skip (db);
+      pdb_db_append_data (db, db->word_root->str, db->word_root->len);
       return;
     }
   else if (!strcmp (name, "drv"))
     {
-      klass = "drv";
-      tagname = "div";
       flags |= PDB_DB_FLAG_IN_DRV;
     }
   else if (!strcmp (name, "kap"))
     {
-      if ((flags & PDB_DB_FLAG_IN_DRV) == 0)
-        {
-          klass = "article-title";
-          tagname = "div";
-        }
-      else
+      if ((db->stack->flags & PDB_DB_FLAG_IN_DRV))
         {
           g_string_append (db->article_buf,
-                           "<div class=\"drv-title\">");
+                           "<kap>");
           g_string_set_size (db->kap_buf, 0);
           pdb_db_push (db,
                        pdb_db_kap_start_cb,
@@ -381,58 +340,67 @@ pdb_db_handle_article_tag (PdbDb *db,
         }
     }
 
-  /* Any attribute that has a mrk attribute gets converted to a tag
-   * with an id attribute and gets added to the mark table */
+  g_string_append_c (db->article_buf, '<');
+  g_string_append (db->article_buf, name);
+
   for (att = atts; att[0]; att += 2)
-    if (!strcmp (att[0], "mrk"))
-      {
-        mark = att[1];
-        break;
-      }
-
-  /* We always need a tag if there is a mark */
-  if (mark != NULL && tagname == NULL)
-    tagname = "span";
-
-  if (tagname != NULL)
-    g_string_append_printf (db->article_buf, "<%s", tagname);
-
-  if (mark != NULL)
     {
-      pdb_db_add_mark (db,
-                       mark,
-                       db->next_article,
-                       db->article_mark_count);
-
-      g_string_append_printf (db->article_buf,
-                              " id=\"mrk%i\"",
-                              db->article_mark_count);
+      if (!strcmp (att[0], "mrk"))
+        {
+          mark = db->article_mark_count++;
+          pdb_db_add_mark (db, att[1], db->articles->len, mark);
+          g_string_append_printf (db->article_buf,
+                                  " mrk=\"%i\"",
+                                  mark);
+        }
+      else
+        {
+          g_string_append_c (db->article_buf, ' ');
+          g_string_append (db->article_buf, att[0]);
+          g_string_append (db->article_buf, "=\"");
+          pdb_db_append_data (db, att[1], strlen (att[1]));
+          g_string_append_c (db->article_buf, '"');
+        }
     }
 
-  if (klass != NULL)
-    g_string_append_printf (db->article_buf, " class=\"%s\"", klass);
+  g_string_append_c (db->article_buf, '>');
 
-  if (tagname)
-    g_string_append_c (db->article_buf, '>');
-
-  pdb_db_push (db,
-               pdb_db_in_article_start_cb,
-               pdb_db_pop_end_cb,
-               pdb_db_append_cd_cb);
-  db->stack->data = (void *) tagname;
-  db->stack->flags = flags;
-
-  if (mark != NULL)
-    db->stack->mark = db->article_mark_count++;
+  if (mark == -1 &&
+      flags == 0 &&
+      db->stack->end_element_handler == pdb_db_copy_end_cb)
+    db->stack->depth++;
+  else
+    {
+      pdb_db_push (db,
+                   pdb_db_copy_start_cb,
+                   pdb_db_copy_end_cb,
+                   pdb_db_copy_cd_cb);
+      if (mark != -1)
+        db->stack->mark = mark;
+      db->stack->flags |= flags;
+    }
 }
 
 static void
-pdb_db_in_article_start_cb (PdbDb *db,
-                            const char *name,
-                            const char **atts)
+pdb_db_copy_end_cb (PdbDb *db,
+                    const char *name)
 {
-  pdb_db_handle_article_tag (db, name, atts);
+  g_string_append (db->article_buf, "</");
+  g_string_append (db->article_buf, name);
+  g_string_append_c (db->article_buf, '>');
+
+  if (--db->stack->depth <= 0)
+    pdb_db_pop (db);
 }
+
+static void
+pdb_db_copy_cd_cb (PdbDb *db,
+                   const char *s,
+                   int len)
+{
+  pdb_db_append_data (db, s, len);
+}
+
 
 static void
 pdb_db_start_element_cb (void *user_data,
@@ -491,7 +459,6 @@ pdb_db_new (PdbRevo *revo,
   db->word_root = g_string_new (NULL);
   db->kap_buf = g_string_new (NULL);
   db->articles = g_ptr_array_new ();
-  db->next_article = NULL;
   db->stack = NULL;
 
   db->marks = g_hash_table_new_full (g_str_hash,
@@ -529,14 +496,15 @@ pdb_db_new (PdbRevo *revo,
           g_string_append_c (db->word_root, '~');
 
           g_string_set_size (db->article_buf, 0);
+          g_string_append (db->article_buf,
+                           "<?xml version=\"1.0\"?>\n");
 
-          db->next_article = g_slice_new (PdbDbArticle);
           db->article_mark_count = 0;
 
           pdb_db_push (db,
-                       pdb_db_in_article_start_cb,
-                       pdb_db_pop_end_cb,
-                       pdb_db_append_cd_cb);
+                       pdb_db_copy_start_cb,
+                       pdb_db_copy_end_cb,
+                       pdb_db_copy_cd_cb);
 
           parse_result = pdb_xml_parse (db->parser,
                                         file,
@@ -548,7 +516,7 @@ pdb_db_new (PdbRevo *revo,
 
           if (parse_result)
             {
-              PdbDbArticle *article = db->next_article;
+              PdbDbArticle *article = g_slice_new (PdbDbArticle);
 
               article->text = g_memdup (db->article_buf->str,
                                         db->article_buf->len + 1);
@@ -558,8 +526,6 @@ pdb_db_new (PdbRevo *revo,
             }
           else
             {
-              g_slice_free (PdbDbArticle, db->next_article);
-
               pdb_db_free (db);
               db = NULL;
 
@@ -617,7 +583,7 @@ pdb_db_save (PdbDb *db,
       for (i = 0; i < db->articles->len; i++)
         {
           PdbDbArticle *article = g_ptr_array_index (db->articles, i);
-          char *article_name = g_strdup_printf ("article-%i.html", i);
+          char *article_name = g_strdup_printf ("article-%i.xml", i);
           char *full_name = g_build_filename (dir,
                                               "assets",
                                               "articles",
