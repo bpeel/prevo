@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * PReVo - A portable version of ReVo for Android
+ * Copyright (C) 2012  Neil Roberts
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+              a:orientation="vertical"
+              a:layout_width="match_parent"
+              a:layout_height="match_parent">
+  <ListView a:id="@android:id/list"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent" />  
+  <TextView a:id="@android:id/empty"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:gravity="center"
+            a:text="@string/no_results"
+            a:visibility="gone" />
+</LinearLayout>
