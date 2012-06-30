@@ -260,9 +260,22 @@ pdb_db_kap_end_cb (PdbDb *db,
                    "Headword found with no containing mrk");
   else
     {
+      int end;
+      const char *start;
+
+      /* Strip trailing spaces from the kap_buf */
+      for (end = db->kap_buf->len;
+           end > 0 && g_ascii_isspace (db->kap_buf->str[end]);
+           end--);
+      db->kap_buf->str[end] = '\0';
+      /* And leading spaces */
+      for (start = db->kap_buf->str;
+           *start && g_ascii_isspace (*start);
+           start++);
+
       pdb_db_add_index_entry (db,
                               "eo",
-                              db->kap_buf->str,
+                              start,
                               db->articles->len,
                               db->stack->mark);
       g_string_append (db->article_buf, "</div>");
