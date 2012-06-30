@@ -40,4 +40,7 @@ pdb_trie_builder_compress (PdbTrieBuilder *builder,
 void
 pdb_trie_builder_free (PdbTrieBuilder *builder);
 
+gboolean
+pdb_trie_builder_is_empty (PdbTrieBuilder *builder);
+
 #endif /* PDB_TRIE_H */

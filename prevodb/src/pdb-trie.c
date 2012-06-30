@@ -245,3 +245,9 @@ pdb_trie_builder_free (PdbTrieBuilder *builder)
 
   g_slice_free (PdbTrieBuilder, builder);
 }
+
+gboolean
+pdb_trie_builder_is_empty (PdbTrieBuilder *builder)
+{
+  return builder->children == NULL;
+}

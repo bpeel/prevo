@@ -268,11 +268,14 @@ pdb_lang_save_language_list (PdbLang *lang,
           PdbLangEntry *entry =
             &g_array_index (lang->languages, PdbLangEntry, i);
 
-          fputs ("<lang code=\"", out);
-          pdb_lang_write_character_data (entry->code, out);
-          fputs ("\">", out);
-          pdb_lang_write_character_data (entry->name, out);
-          fputs ("</lang>\n", out);
+          if (!pdb_trie_builder_is_empty (entry->trie))
+            {
+              fputs ("<lang code=\"", out);
+              pdb_lang_write_character_data (entry->code, out);
+              fputs ("\">", out);
+              pdb_lang_write_character_data (entry->name, out);
+              fputs ("</lang>\n", out);
+            }
         }
 
       fputs ("</languages>\n", out);
@@ -300,30 +303,34 @@ pdb_lang_save_indices (PdbLang *lang,
         {
           PdbLangEntry *entry =
             &g_array_index (lang->languages, PdbLangEntry, i);
-          char *index_name = g_strdup_printf ("index-%s.bin", entry->code);
-          char *full_name =
-            g_build_filename (dir, "assets", "indices", index_name, NULL);
-          guint8 *compressed_data;
-          int compressed_len;
-          gboolean write_status;
 
-          pdb_trie_builder_compress (entry->trie,
-                                     &compressed_data,
-                                     &compressed_len);
-
-          write_status = g_file_set_contents (full_name,
-                                              (char *) compressed_data,
-                                              compressed_len,
-                                              error);
-
-          g_free (full_name);
-          g_free (index_name);
-          g_free (compressed_data);
-
-          if (!write_status)
+          if (!pdb_trie_builder_is_empty (entry->trie))
             {
-              break;
-              ret = FALSE;
+              char *index_name = g_strdup_printf ("index-%s.bin", entry->code);
+              char *full_name =
+                g_build_filename (dir, "assets", "indices", index_name, NULL);
+              guint8 *compressed_data;
+              int compressed_len;
+              gboolean write_status;
+
+              pdb_trie_builder_compress (entry->trie,
+                                         &compressed_data,
+                                         &compressed_len);
+
+              write_status = g_file_set_contents (full_name,
+                                                  (char *) compressed_data,
+                                                  compressed_len,
+                                                  error);
+
+              g_free (full_name);
+              g_free (index_name);
+              g_free (compressed_data);
+
+              if (!write_status)
+                {
+                  break;
+                  ret = FALSE;
+                }
             }
         }
     }
