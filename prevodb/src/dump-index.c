@@ -88,6 +88,8 @@ dump_trie (const guint8 *trie_data,
       is_word = !!(article_num & 0x8000);
       has_display_name = !!(article_num & 0x4000);
 
+      article_num &= 0x3fff;
+
       trie_data += 3;
       trie_length -= 3;
 
