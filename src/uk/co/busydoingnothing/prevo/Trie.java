@@ -120,7 +120,7 @@ public class Trie
 
     /* Read 4 bytes to get the length of the file */
     readAll (dataStream, lengthBytes, 0, lengthBytes.length);
-    totalLength = extractInt (lengthBytes, 0);
+    totalLength = extractInt (lengthBytes, 0) & 0x7fffffff;
 
     /* Create a byte array big enough to hold the entire file and copy
      * the length we just read into the beginning */
