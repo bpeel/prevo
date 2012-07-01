@@ -331,23 +331,30 @@ pdb_db_kap_start_cb (PdbDb *db,
   pdb_db_copy_start_cb (db, name, atts);
 }
 
-static const char *
+static void
 pdb_db_trim_buf (GString *buf)
 {
-  const char *start;
-  char *end;
+  char *dst;
+  const char *src;
 
-  /* Strip trailing spaces from the tmp_buf */
-  for (end = buf->str + buf->len;
-       end > buf->str && g_ascii_isspace (end[-1]);
-       end--);
-  *end = '\0';
-  /* And leading spaces */
-  for (start = buf->str;
-       start < end && g_ascii_isspace (*start);
-       start++);
+  /* Skip leading spaces and replacing all sets of whitespace
+   * characters with a single space */
+  for (dst = buf->str, src = buf->str;
+       *src;
+       src++)
+    if (g_ascii_isspace (*src))
+      {
+        if (dst > buf->str && dst[-1] != ' ')
+          *(dst)++ = ' ';
+      }
+    else
+      *(dst++) = *src;
 
-  return start;
+  /* Remove any trailing space */
+  if (dst > buf->str && dst[-1] == ' ')
+    dst--;
+
+  g_string_set_size (buf, dst - buf->str);
 }
 
 static void
@@ -361,11 +368,11 @@ pdb_db_kap_end_cb (PdbDb *db,
                    "Headword found with no containing mrk");
   else
     {
-      const char *start = pdb_db_trim_buf (db->tmp_buf);
+      pdb_db_trim_buf (db->tmp_buf);
 
       pdb_db_add_index_entry (db,
                               "eo",
-                              start,
+                              db->tmp_buf->str,
                               db->articles->len,
                               db->stack->mark);
       g_string_append (db->article_buf, "</kap>");
@@ -408,13 +415,12 @@ pdb_db_translation_end_cb (PdbDb *db,
       if (db->stack->data)
         {
           char *lang = db->stack->data;
-          const char *name;
 
-          name = pdb_db_trim_buf (db->tmp_buf);
+          pdb_db_trim_buf (db->tmp_buf);
 
           pdb_db_add_index_entry (db,
                                   lang,
-                                  name,
+                                  db->tmp_buf->str,
                                   db->articles->len,
                                   db->stack->mark);
 
