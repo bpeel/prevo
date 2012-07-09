@@ -22,13 +22,14 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.util.Base64;
+import android.text.SpannableString;
 import android.util.Log;
-import android.webkit.WebView;
-import java.io.ByteArrayOutputStream;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import java.io.InputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.charset.Charset;
 
 public class ArticleActivity extends Activity
 {
@@ -39,49 +40,143 @@ public class ArticleActivity extends Activity
 
   public static final String TAG = "prevoarticle";
 
-  private WebView webView;
+  private Charset utf8Charset = Charset.forName ("UTF-8");
 
-  private static void appendStream (OutputStream out,
-                                    InputStream in)
+  private static void throwEOF ()
     throws IOException
   {
-    byte[] buf = new byte[512];
-    int got;
-
-    while ((got = in.read (buf)) != -1)
-      out.write (buf, 0, got);
+    throw new IOException ("Unexpected EOF");
   }
 
-  private void loadArticle (int article,
-                            int mark)
+  private boolean maybeReadAll (InputStream in,
+                                byte[] array,
+                                int offset,
+                                int length)
     throws IOException
   {
-    Resources resources = getResources ();
+    int got = in.read (array, offset, length);
+
+    if (got == -1)
+      return false;
+    else if (got != length)
+      throwEOF ();
+
+    return true;
+  }
+
+  private boolean maybeReadAll (InputStream in,
+                                byte[] array)
+    throws IOException
+  {
+    return maybeReadAll (in, array, 0, array.length);
+  }
+
+  private void readAll (InputStream in,
+                        byte[] array,
+                        int offset,
+                        int length)
+    throws IOException
+  {
+    if (!maybeReadAll (in, array, offset, length))
+      throwEOF ();
+  }
+
+  private void readAll (InputStream in,
+                        byte[] array)
+    throws IOException
+  {
+    readAll (in, array, 0, array.length);
+  }
+
+  private int maybeReadShort (InputStream in)
+    throws IOException
+  {
+    byte[] shortBuf = new byte[2];
+    if (maybeReadAll (in, shortBuf))
+      return (shortBuf[0] & 0xff) | ((shortBuf[1] & 0xff) << 8);
+    else
+      return -1;
+  }
+
+  private int readShort (InputStream in)
+    throws IOException
+  {
+    int val = maybeReadShort (in);
+
+    if (val == -1)
+      throwEOF ();
+
+    return val;
+  }
+
+  private SpannableString maybeReadSpannableString (InputStream in)
+    throws IOException
+  {
+    int strLength = maybeReadShort (in);
+
+    if (strLength == -1)
+      return null;
+
+    byte[] utf8String = new byte[strLength];
+
+    readAll (in, utf8String);
+
+    SpannableString string =
+      new SpannableString (new String (utf8String, utf8Charset));
+
+    while (readShort (in) != 0)
+      if (in.read () == -1)
+        throwEOF ();
+
+    return string;
+  }
+
+  private SpannableString readSpannableString (InputStream in)
+    throws IOException
+  {
+    SpannableString val = maybeReadSpannableString (in);
+
+    if (val == null)
+      throwEOF ();
+
+    return val;
+  }
+
+  private LinearLayout loadArticle (int article,
+                                    int mark)
+    throws IOException
+  {
     AssetManager assetManager = getAssets ();
-    ByteArrayOutputStream buf = new ByteArrayOutputStream ();
+    InputStream in = assetManager.open ("articles/article-" + article + ".bin");
 
-    appendStream (buf, resources.openRawResource (R.raw.article_header));
-    appendStream (buf, assetManager.open ("articles/article-" + article +
-                                          ".xml"));
-    appendStream (buf, resources.openRawResource (R.raw.article_footer));
+    setTitle (readSpannableString (in));
 
-    StringBuilder url =
-      new StringBuilder ("data:text/html;charset=UTF-8;base64,");
-    url.append (Base64.encodeToString (buf.toByteArray (),
-                                       Base64.NO_WRAP));
+    LinearLayout layout = new LinearLayout (this);
+    layout.setOrientation (LinearLayout.VERTICAL);
 
-    webView.loadUrl (url.toString ());
+    SpannableString str;
+
+    while ((str = maybeReadSpannableString (in)) != null)
+      {
+        TextView tv = new TextView (this);
+
+        tv.setText (str, TextView.BufferType.SPANNABLE);
+
+        layout.addView (tv);
+      }
+
+    return layout;
   }
 
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
-    setContentView (R.layout.article);
-
-    this.webView = (WebView) findViewById (R.id.article_webview);
 
     Intent intent = getIntent ();
+    ScrollView scrollView = new ScrollView (this);
+
+    setContentView (scrollView);
 
     if (intent != null)
       {
@@ -92,7 +187,7 @@ public class ArticleActivity extends Activity
           {
             try
               {
-                loadArticle (article, mark);
+                scrollView.addView (loadArticle (article, mark));
               }
             catch (IOException e)
               {
