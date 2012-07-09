@@ -952,7 +952,7 @@ pdb_db_save (PdbDb *db,
   if (!pdb_lang_save (db->lang, dir, error))
     return FALSE;
 
-  if (pdb_try_mkdir (error, dir, "assets", "articles", error))
+  if (pdb_try_mkdir (error, dir, "assets", "articles", NULL))
     {
       int i;
 
