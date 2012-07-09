@@ -884,6 +884,8 @@ pdb_db_free (PdbDb *db)
       pdb_db_free_reference_list (article->references);
 
       g_free (article->text);
+
+      g_slice_free (PdbDbArticle, article);
     }
 
   pdb_db_free_reference_list (db->references.head);
