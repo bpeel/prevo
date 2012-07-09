@@ -30,6 +30,16 @@ struct _PdbRevo
   char *zip_file;
 };
 
+struct _PdbRevoFile
+{
+  GPid child_pid;
+  int child_out, child_err;
+  gboolean in_end;
+  gboolean err_end;
+  gboolean child_reaped;
+  GString *error_buf;
+};
+
 PdbRevo *
 pdb_revo_new (const char *filename,
               GError **error)
@@ -42,23 +52,14 @@ pdb_revo_new (const char *filename,
   return revo;
 }
 
-static gboolean
-pdb_revo_execute_command (PdbRevo *revo,
-                          char **argv,
-                          PdbRevoReadCb func,
-                          void *user_data,
-                          GError **error)
+static PdbRevoFile *
+pdb_revo_open_command (PdbRevo *revo,
+                       char **argv,
+                       GError **error)
 {
-  char buf[512];
-  gboolean ret = TRUE;
   int child_out, child_err;
   GPid child_pid;
-  int got;
-  GString *error_buf;
-  gboolean in_end = FALSE, err_end = FALSE;
-  gboolean aborted = FALSE;
-  int child_status;
-  PdbRevoReadStatus func_status;
+  PdbRevoFile *revo_file;
 
   if (!g_spawn_async_with_pipes (NULL, /* working dir */
                                  argv,
@@ -72,30 +73,97 @@ pdb_revo_execute_command (PdbRevo *revo,
                                  &child_out, /* stdout */
                                  &child_err, /* stderr */
                                  error))
-    return FALSE;
+    return NULL;
 
-  error_buf = g_string_new (NULL);
+  revo_file = g_slice_new (PdbRevoFile);
 
-  do
+  revo_file->child_pid = child_pid;
+  revo_file->child_out = child_out;
+  revo_file->child_err = child_err;
+  revo_file->in_end = FALSE;
+  revo_file->err_end = FALSE;
+  revo_file->child_reaped = FALSE;
+  revo_file->error_buf = g_string_new (NULL);
+
+  return revo_file;
+}
+
+static gboolean
+pdb_revo_check_error (PdbRevoFile *file,
+                      GError **error)
+{
+  int child_status;
+
+  /* This probably shouldn't happen because that would mean we've
+   * already reported an error or end-of-file. */
+  if (file->child_reaped)
+    return TRUE;
+
+  while (waitpid (file->child_pid, &child_status, 0 /* options */) == -1 &&
+         errno == EINTR);
+
+  file->child_reaped = TRUE;
+
+  if (!WIFEXITED (child_status) || WEXITSTATUS (child_status))
+    {
+      char *end = strchr (file->error_buf->str, '\n');
+
+      if (end == NULL)
+        end = file->error_buf->str + file->error_buf->len;
+      else
+        {
+          while (end > file->error_buf->str && g_ascii_isspace (end[-1]))
+            end--;
+          *end = '\0';
+        }
+
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_UNZIP_FAILED,
+                   "%s",
+                   file->error_buf->str[0] ?
+                   file->error_buf->str :
+                   "Unzip failed");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+gboolean
+pdb_revo_read (PdbRevoFile *file,
+               char *buf,
+               size_t *buflen,
+               GError **error)
+{
+  size_t total_got = 0;
+
+  while (*buflen > 0)
     {
       GPollFD fds[2];
       int nfds = 0;
       int i;
 
-      if (!err_end)
+      if (!file->err_end)
         {
-          fds[nfds].fd = child_err;
+          fds[nfds].fd = file->child_err;
           fds[nfds].events = G_IO_IN | G_IO_ERR | G_IO_HUP;
           fds[nfds].revents = 0;
           nfds++;
         }
 
-      if (!in_end)
+      if (!file->in_end)
         {
-          fds[nfds].fd = child_out;
+          fds[nfds].fd = file->child_out;
           fds[nfds].events = G_IO_IN | G_IO_ERR | G_IO_HUP;
           fds[nfds].revents = 0;
           nfds++;
+        }
+
+      if (nfds == 0)
+        {
+          *buflen = total_got;
+          return pdb_revo_check_error (file, error);
         }
 
       if (g_poll (fds, nfds, -1) == -1)
@@ -105,105 +173,82 @@ pdb_revo_execute_command (PdbRevo *revo,
                        g_file_error_from_errno (errno),
                        "poll: %s",
                        strerror (errno));
-          ret = FALSE;
-          goto done;
-        }
-      else
-        for (i = 0; i < nfds; i++)
-          if (fds[i].fd == child_out &&
-              (fds[i].revents & (G_IO_IN | G_IO_ERR | G_IO_HUP)))
-            {
-              got = read (child_out, buf, sizeof (buf));
-
-              if (got == -1)
-                {
-                  g_set_error (error,
-                               G_FILE_ERROR,
-                               g_file_error_from_errno (errno),
-                               "%s",
-                               strerror (errno));
-                  ret = FALSE;
-                  goto done;
-                }
-              else if ((func_status = func (buf,
-                                            got,
-                                            got == 0,
-                                            user_data,
-                                            error)) !=
-                       PDB_REVO_READ_STATUS_OK)
-                {
-                  if (func_status == PDB_REVO_READ_STATUS_ABORT)
-                    aborted = TRUE;
-                  ret = FALSE;
-                  goto done;
-                }
-              else if (got == 0)
-                in_end = TRUE;
-            }
-          else if (fds[i].fd == child_err &&
-                   (fds[i].revents & (G_IO_IN | G_IO_ERR | G_IO_HUP)))
-
-            {
-              g_string_set_size (error_buf, error_buf->len + 512);
-
-              got = read (child_err, error_buf->str, 512);
-
-              if (got == -1)
-                {
-                  g_set_error (error,
-                               G_FILE_ERROR,
-                               g_file_error_from_errno (errno),
-                               "%s",
-                               strerror (errno));
-                  ret = FALSE;
-                  goto done;
-                }
-              else
-                {
-                  g_string_set_size (error_buf, error_buf->len - 512 + got);
-                  if (got == 0)
-                    err_end = TRUE;
-                }
-            }
-    } while (!err_end || !in_end);
-
- done:
-
-  close (child_out);
-  close (child_err);
-
-  while (waitpid (child_pid, &child_status, 0 /* options */) == -1 &&
-         errno == EINTR);
-
-  if (!aborted && (!WIFEXITED (child_status) || WEXITSTATUS (child_status)))
-    {
-      char *end = strchr (error_buf->str, '\n');
-
-      if (!ret && error)
-        g_clear_error (error);
-
-      if (end == NULL)
-        end = error_buf->str + error_buf->len;
-      else
-        {
-          while (end > error_buf->str && g_ascii_isspace (end[-1]))
-            end--;
-          *end = '\0';
+          return FALSE;
         }
 
-      g_set_error (error,
-                   PDB_ERROR,
-                   PDB_ERROR_UNZIP_FAILED,
-                   "%s",
-                   error_buf->str[0] ?
-                   error_buf->str :
-                   "Unzip failed");
-      ret = FALSE;
+      for (i = 0; i < nfds; i++)
+        if (fds[i].fd == file->child_out &&
+            (fds[i].revents & (G_IO_IN | G_IO_ERR | G_IO_HUP)))
+          {
+            ssize_t got = read (file->child_out, buf, *buflen);
+
+            if (got == -1)
+              {
+                g_set_error (error,
+                             G_FILE_ERROR,
+                             g_file_error_from_errno (errno),
+                             "%s",
+                             strerror (errno));
+                return FALSE;
+              }
+            else if (got == 0)
+              file->in_end = TRUE;
+            else
+              {
+                total_got += got;
+                *buflen -= got;
+                buf += got;
+              }
+          }
+        else if (fds[i].fd == file->child_err &&
+                 (fds[i].revents & (G_IO_IN | G_IO_ERR | G_IO_HUP)))
+
+          {
+            ssize_t got;
+
+            g_string_set_size (file->error_buf, file->error_buf->len + 512);
+
+            got = read (file->child_err, file->error_buf->str, 512);
+
+            if (got == -1)
+              {
+                g_set_error (error,
+                             G_FILE_ERROR,
+                             g_file_error_from_errno (errno),
+                             "%s",
+                             strerror (errno));
+                return FALSE;
+              }
+            else
+              {
+                g_string_set_size (file->error_buf,
+                                   file->error_buf->len - 512 + got);
+                if (got == 0)
+                  file->err_end = TRUE;
+              }
+          }
     }
 
-  g_string_free (error_buf, TRUE);
+  *buflen = total_got;
 
-  return ret;
+  return TRUE;
+}
+
+void
+pdb_revo_close (PdbRevoFile *file)
+{
+  int child_status;
+
+  close (file->child_out);
+  close (file->child_err);
+
+  if (!file->child_reaped)
+    while (waitpid (file->child_pid, &child_status, 0 /* options */) == -1 &&
+           errno == EINTR);
+
+  g_string_free (file->error_buf, TRUE);
+
+  g_slice_free (PdbRevoFile, file);
 }
 
 typedef struct
@@ -213,15 +258,15 @@ typedef struct
   gboolean in_list;
 } PdbRevoListFilesData;
 
-static PdbRevoReadStatus
-pdb_revo_list_files_process_line (const char *line,
-                                  PdbRevoListFilesData *data,
+static gboolean
+pdb_revo_list_files_process_line (PdbRevoListFilesData *data,
+                                  const char *line,
                                   GError **error)
 {
   if (g_str_has_prefix (line, "---"))
     {
       data->in_list = !data->in_list;
-      return PDB_REVO_READ_STATUS_OK;
+      return TRUE;
     }
 
   if (data->in_list)
@@ -251,7 +296,7 @@ pdb_revo_list_files_process_line (const char *line,
       g_ptr_array_add (data->files, g_strdup (line));
     }
 
-  return PDB_REVO_READ_STATUS_OK;
+  return TRUE;
 
  error:
   g_set_error (error,
@@ -259,17 +304,15 @@ pdb_revo_list_files_process_line (const char *line,
                PDB_ERROR_UNZIP_FAILED,
                "Unexepected data from unzip");
 
-  return PDB_REVO_READ_STATUS_ERROR;
+  return FALSE;
 }
 
-static PdbRevoReadStatus
-pdb_revo_list_files_cb (const char *buf,
-                        int len,
-                        gboolean end,
-                        void *user_data,
-                        GError **error)
+static gboolean
+pdb_revo_list_files_handle_data (PdbRevoListFilesData *data,
+                                 const char *buf,
+                                 int len,
+                                 GError **error)
 {
-  PdbRevoListFilesData *data = user_data;
   char *line_end;
   int pos = 0;
 
@@ -277,7 +320,7 @@ pdb_revo_list_files_cb (const char *buf,
     {
       g_set_error (error, PDB_ERROR, PDB_ERROR_BAD_FORMAT,
                    "%s", "Embedded '\0' found in unzip listing");
-      return PDB_REVO_READ_STATUS_ABORT;
+      return FALSE;
     }
 
   g_string_append_len (data->line_buf, buf, len);
@@ -286,18 +329,15 @@ pdb_revo_list_files_cb (const char *buf,
                              '\n',
                              data->line_buf->len - pos)))
     {
-      PdbRevoReadStatus status;
-
       *line_end = '\0';
 
       if (line_end - data->line_buf->str > pos && line_end[-1] == '\r')
         line_end[-1] = '\0';
 
-      status = pdb_revo_list_files_process_line (data->line_buf->str + pos,
-                                                 data,
-                                                 error);
-      if (status != PDB_REVO_READ_STATUS_OK)
-        return status;
+      if (!pdb_revo_list_files_process_line (data,
+                                             data->line_buf->str + pos,
+                                             error))
+        return FALSE;
 
       pos = line_end - data->line_buf->str + 1;
     }
@@ -308,7 +348,7 @@ pdb_revo_list_files_cb (const char *buf,
            data->line_buf->len - pos);
   g_string_set_size (data->line_buf, data->line_buf->len - pos);
 
-  return PDB_REVO_READ_STATUS_OK;
+  return TRUE;
 }
 
 char **
@@ -317,20 +357,40 @@ pdb_revo_list_files (PdbRevo *revo,
                      GError **error)
 {
   PdbRevoListFilesData data;
+  PdbRevoFile *file;
   gchar *argv[] = { "unzip", "-l", revo->zip_file, (char *) glob, NULL };
-  char **ret;
+  gboolean res = TRUE;
 
   data.files = g_ptr_array_new ();
   data.line_buf = g_string_new (NULL);
 
-  if (pdb_revo_execute_command (revo,
-                                argv,
-                                pdb_revo_list_files_cb,
-                                &data,
-                                error))
+  if ((file = pdb_revo_open_command (revo, argv, error)))
+    {
+      char buf[512];
+      size_t got;
+
+      while (TRUE)
+        {
+          got = sizeof (buf);
+          if (!pdb_revo_read (file, buf, &got, error) ||
+              !pdb_revo_list_files_handle_data (&data, buf, got, error))
+            {
+              res = FALSE;
+              break;
+            }
+          else if (got < sizeof (buf))
+            break;
+        }
+
+      pdb_revo_close (file);
+    }
+
+  g_string_free (data.line_buf, TRUE);
+
+  if (res)
     {
       g_ptr_array_add (data.files, NULL);
-      ret = (char **) g_ptr_array_free (data.files, FALSE);
+      return (char **) g_ptr_array_free (data.files, FALSE);
     }
   else
     {
@@ -341,12 +401,8 @@ pdb_revo_list_files (PdbRevo *revo,
 
       g_ptr_array_free (data.files, TRUE);
 
-      ret = NULL;
+      return NULL;
     }
-
-  g_string_free (data.line_buf, TRUE);
-
-  return ret;
 }
 
 static char *
@@ -382,27 +438,21 @@ pdb_revo_expand_filename (const char *filename)
   return ret;
 }
 
-gboolean
-pdb_revo_parse_file (PdbRevo *revo,
-                     const char *filename,
-                     PdbRevoReadCb func,
-                     void *user_data,
-                     GError **error)
+PdbRevoFile *
+pdb_revo_open (PdbRevo *revo,
+               const char *filename,
+               GError **error)
 {
   char *argv[] = { "unzip", "-p", revo->zip_file, NULL, NULL };
-  gboolean ret;
+  PdbRevoFile *file;
 
   argv[3] = pdb_revo_expand_filename (filename);
 
-  ret = pdb_revo_execute_command (revo,
-                                  argv,
-                                  func,
-                                  user_data,
-                                  error);
+  file = pdb_revo_open_command (revo, argv, error);
 
   g_free (argv[3]);
 
-  return ret;
+  return file;
 }
 
 void

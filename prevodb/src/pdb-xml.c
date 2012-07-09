@@ -82,14 +82,13 @@ pdb_xml_get_parser (PdbXmlParser *parser)
                         parser->stack->len - 1).parser;
 }
 
-static PdbRevoReadStatus
-pdb_xml_parse_cb (const char *buf,
-                  int len,
-                  gboolean end,
-                  void *user_data,
-                  GError **error)
+static gboolean
+pdb_xml_handle_data (PdbXmlParser *parser,
+                     const char *buf,
+                     int len,
+                     gboolean end,
+                     GError **error)
 {
-  PdbXmlParser *parser = user_data;
   XML_Parser xml_parser = pdb_xml_get_parser (parser);
 
   if (XML_Parse (xml_parser, buf, len, end) == XML_STATUS_ERROR)
@@ -100,15 +99,15 @@ pdb_xml_parse_cb (const char *buf,
         case XML_ERROR_EXTERNAL_ENTITY_HANDLING:
           g_propagate_error (error, parser->abort_error);
           parser->abort_error = NULL;
-          return PDB_REVO_READ_STATUS_ABORT;
+          return FALSE;
 
         default:
           pdb_error_from_parser (parser, error);
-          return PDB_REVO_READ_STATUS_ERROR;
+          return FALSE;
         }
     }
   else
-    return PDB_REVO_READ_STATUS_OK;
+    return TRUE;
 }
 
 static void
@@ -148,7 +147,8 @@ pdb_xml_parse (PdbXmlParser *parser,
                const char *filename,
                GError **error)
 {
-  gboolean ret;
+  PdbRevoFile *file;
+  gboolean ret = TRUE;
   const char *last_slash;
 
   if ((last_slash = strrchr (filename, '/')))
@@ -162,11 +162,35 @@ pdb_xml_parse (PdbXmlParser *parser,
                  PdbXmlStackEntry,
                  parser->stack->len - 1).filename = filename;
 
-  ret = pdb_revo_parse_file (parser->revo,
-                             filename,
-                             pdb_xml_parse_cb,
-                             parser,
-                             error);
+  file = pdb_revo_open (parser->revo,
+                        filename,
+                        error);
+
+  if (file == NULL)
+    ret = FALSE;
+  else
+    {
+      char buf[512];
+      size_t got;
+
+      do
+        {
+          got = sizeof (buf);
+          if (!pdb_revo_read (file, buf, &got, error) ||
+              !pdb_xml_handle_data (parser,
+                                    buf,
+                                    got,
+                                    got < sizeof (buf),
+                                    error))
+            {
+              ret = FALSE;
+              break;
+            }
+        }
+      while (got >= sizeof (buf));
+
+      pdb_revo_close (file);
+    }
 
   g_array_index (parser->stack,
                  PdbXmlStackEntry,
