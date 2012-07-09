@@ -363,6 +363,7 @@ pdb_revo_list_files (PdbRevo *revo,
 
   data.files = g_ptr_array_new ();
   data.line_buf = g_string_new (NULL);
+  data.in_list = FALSE;
 
   if ((file = pdb_revo_open_command (revo, argv, error)))
     {
