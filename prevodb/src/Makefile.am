@@ -8,6 +8,8 @@ prevodb_SOURCES = \
 	main.c \
 	pdb-db.c \
 	pdb-db.h \
+	pdb-doc.c \
+	pdb-doc.h \
 	pdb-error.c \
 	pdb-error.h \
 	pdb-lang.c \
