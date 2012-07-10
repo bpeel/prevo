@@ -20,6 +20,7 @@
 /prevodb/src/Makefile.in
 /prevodb/src/prevodb
 /prevodb/src/dump-index
+/prevodb/src/test-doc
 /prevodb/stamp-h1
 
 /assets/articles/article-*.xml
