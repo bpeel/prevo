@@ -54,12 +54,16 @@ public class ArticleActivity extends Activity
                                 int length)
     throws IOException
   {
-    int got = in.read (array, offset, length);
+    while (length > 0)
+      {
+        int got = in.read (array, offset, length);
 
-    if (got == -1)
-      return false;
-    else if (got != length)
-      throwEOF ();
+        if (got == -1)
+          return false;
+
+        offset += got;
+        length -= got;
+      }
 
     return true;
   }
