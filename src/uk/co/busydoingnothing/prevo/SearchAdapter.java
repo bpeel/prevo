@@ -124,7 +124,7 @@ public class SearchAdapter extends BaseAdapter
   }
 
   @Override
-  public SearchFilter getFilter ()
+  public Filter getFilter ()
   {
     if (filter == null)
       filter = new SearchFilter ();

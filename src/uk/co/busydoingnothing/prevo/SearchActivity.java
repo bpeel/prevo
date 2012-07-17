@@ -20,15 +20,21 @@ package uk.co.busydoingnothing.prevo;
 import android.app.ListActivity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
+import android.widget.TextView;
 import java.io.InputStream;
 
 public class SearchActivity extends ListActivity
+  implements TextWatcher
 {
   public static final String EXTRA_LANGUAGE =
     "uk.co.busydoingnothing.prevo.Language";
+
+  private SearchAdapter searchAdapter;
 
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -51,10 +57,12 @@ public class SearchActivity extends ListActivity
                 InputStream indexIn =
                   getAssets ().open ("indices/index-" + language + ".bin");
                 Trie trie = new Trie (indexIn);
-                SearchAdapter adapter = new SearchAdapter (this, trie);
-                setListAdapter (adapter);
+                searchAdapter = new SearchAdapter (this, trie);
 
-                lv.setTextFilterEnabled (true);
+                lv.setAdapter (searchAdapter);
+
+                TextView tv = (TextView) findViewById (R.id.search_edit);
+                tv.addTextChangedListener (this);
               }
             catch (java.io.IOException e)
               {
@@ -83,5 +91,27 @@ public class SearchActivity extends ListActivity
           startActivity (intent);
         }
       });
+  }
+
+  @Override
+  public void afterTextChanged (Editable s)
+  {
+    searchAdapter.getFilter ().filter (s);
+  }
+
+  @Override
+  public void beforeTextChanged (CharSequence s,
+                                 int start,
+                                 int count,
+                                 int after)
+  {
+  }
+
+  @Override
+  public void onTextChanged (CharSequence s,
+                             int start,
+                             int before,
+                             int count)
+  {
   }
 }

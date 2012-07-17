@@ -22,4 +22,5 @@
   <string name="select_language">Elektu lingvon</string>
   <string name="search">Serĉu</string>
   <string name="no_results">Neniuj vortoj troviĝis</string>
+  <string name="type_to_filter">Tajpu ion por serĉi</string>
 </resources>
