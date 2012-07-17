@@ -61,35 +61,61 @@ typedef struct
   /* This will be NULL unless the display name for this article is
    * different from the string to search for stored in the trie */
   char *display_word;
+
+  void *data;
 } PdbTrieArticle;
 
-struct _PdbTrie
+typedef struct
 {
   GSList *articles;
   GSList *children;
   gunichar letter;
+} PdbTrieNode;
+
+struct _PdbTrie
+{
+  PdbTrieNode *root;
+  PdbTrieFreeDataCb free_data_cb;
+  PdbTrieGetReferenceCb get_reference_cb;
+  void *user_data;
 };
 
-PdbTrie *
-pdb_trie_new (void)
+static PdbTrieNode *
+pdb_trie_node_new (void)
 {
-  PdbTrie *root = g_slice_new (PdbTrie);
+  PdbTrieNode *node = g_slice_new (PdbTrieNode);
 
-  root->letter = '['; /* This isn't used anywhere. [ is the next
+  node->letter = '['; /* This isn't used anywhere. [ is the next
                          character after Z */
-  root->articles = NULL;
-  root->children = NULL;
+  node->articles = NULL;
+  node->children = NULL;
 
-  return root;
+  return node;
+}
+
+PdbTrie *
+pdb_trie_new (PdbTrieFreeDataCb free_data_cb,
+              PdbTrieGetReferenceCb get_reference_cb,
+              void *user_data)
+{
+  PdbTrie *trie = g_slice_new (PdbTrie);
+  PdbTrieNode *root = pdb_trie_node_new ();
+
+  trie->free_data_cb = free_data_cb;
+  trie->get_reference_cb = get_reference_cb;
+  trie->user_data = user_data;
+  trie->root = root;
+
+  return trie;
 }
 
 void
 pdb_trie_add_word (PdbTrie *trie,
                    const char *word,
                    const char *display_word,
-                   int article_num,
-                   int mark_num)
+                   void *data)
 {
+  PdbTrieNode *node = trie->root;
   PdbTrieArticle *article;
 
   while (*word)
@@ -98,13 +124,13 @@ pdb_trie_add_word (PdbTrie *trie,
       gunichar ch = g_utf8_get_char (word);
 
       /* Look for a child with this letter */
-      for (l = trie->children; l; l = l->next)
+      for (l = node->children; l; l = l->next)
         {
-          PdbTrie *child = l->data;
+          PdbTrieNode *child = l->data;
 
           if (child->letter == ch)
             {
-              trie = child;
+              node = child;
               break;
             }
         }
@@ -112,16 +138,16 @@ pdb_trie_add_word (PdbTrie *trie,
       /* If we didn't find a child then add another */
       if (l == NULL)
         {
-          PdbTrie *child = pdb_trie_new ();
+          PdbTrieNode *child = pdb_trie_node_new ();
           GSList *prev = NULL, *l;
 
           child->letter = ch;
 
           /* Find a place to insert this node so the children will
            * remain sorted */
-          for (l = trie->children; l; l = l->next)
+          for (l = node->children; l; l = l->next)
             {
-              PdbTrie *sibling = l->data;
+              PdbTrieNode *sibling = l->data;
 
               if (pdb_strcmp_ch (ch, sibling->letter) <= 0)
                 break;
@@ -130,28 +156,28 @@ pdb_trie_add_word (PdbTrie *trie,
             }
 
           if (prev == NULL)
-            trie->children = g_slist_prepend (trie->children, child);
+            node->children = g_slist_prepend (node->children, child);
           else
             prev->next = g_slist_prepend (prev->next, child);
 
-          trie = child;
+          node = child;
         }
 
       word = g_utf8_next_char (word);
     }
 
   article = g_slice_new (PdbTrieArticle);
-  article->article_num = article_num;
-  article->mark_num = mark_num;
+  article->data = data;
   if (display_word)
     article->display_word = g_strdup (display_word);
   else
     article->display_word = NULL;
-  trie->articles = g_slist_prepend (trie->articles, article);
+  node->articles = g_slist_prepend (node->articles, article);
 }
 
 static void
 pdb_trie_compress_node (PdbTrie *trie,
+                        PdbTrieNode *node,
                         GByteArray *data)
 {
   int node_start = data->len;
@@ -164,16 +190,26 @@ pdb_trie_compress_node (PdbTrie *trie,
 
   /* Add a UTF-8 encoded representation of the character of this node */
   g_byte_array_set_size (data, data->len + 6);
-  character_len = g_unichar_to_utf8 (trie->letter,
+  character_len = g_unichar_to_utf8 (node->letter,
                                      (char *) data->data + data->len - 6);
   g_byte_array_set_size (data, data->len - 6 + character_len);
 
   /* Optionally add the articles */
-  for (l = trie->articles; l; l = l->next)
+  for (l = node->articles; l; l = l->next)
     {
       PdbTrieArticle *article = l->data;
-      guint16 article_num = article->article_num;
+      int article_num_val;
+      int mark_num_val;
+      guint16 article_num;
       guint8 mark_num = article->mark_num;
+
+      trie->get_reference_cb (article->data,
+                              &article_num_val,
+                              &mark_num_val,
+                              trie->user_data);
+
+      article_num = article_num_val;
+      mark_num = mark_num_val;
 
       if (l->next != NULL)
         article_num |= 0x8000;
@@ -198,12 +234,12 @@ pdb_trie_compress_node (PdbTrie *trie,
     }
 
   /* Add all of the child nodes */
-  for (l = trie->children; l; l = l->next)
-    pdb_trie_compress_node (l->data, data);
+  for (l = node->children; l; l = l->next)
+    pdb_trie_compress_node (trie, l->data, data);
 
   /* Write the offset */
   offset = data->len - node_start;
-  if (trie->articles)
+  if (node->articles)
     offset |= 1 << (guint32) 31;
   offset = GUINT32_TO_LE (offset);
 
@@ -217,7 +253,7 @@ pdb_trie_compress (PdbTrie *trie,
 {
   GByteArray *data_buf = g_byte_array_new ();
 
-  pdb_trie_compress_node (trie, data_buf);
+  pdb_trie_compress_node (trie, trie->root, data_buf);
 
   *data = data_buf->data;
   *len = data_buf->len;
@@ -226,28 +262,41 @@ pdb_trie_compress (PdbTrie *trie,
 }
 
 static void
-pdb_trie_article_free (PdbTrieArticle *article)
+pdb_trie_article_free (PdbTrieArticle *article,
+                       PdbTrie *trie)
 {
+  if (trie->free_data_cb)
+    trie->free_data_cb (article->data,
+                        trie->user_data);
+
   g_free (article->display_word);
   g_slice_free (PdbTrieArticle, article);
+}
+
+static void
+pdb_trie_free_node (PdbTrieNode *node,
+                    PdbTrie *trie)
+{
+  g_slist_foreach (node->children, (GFunc) pdb_trie_free_node, trie);
+  g_slist_free (node->children);
+
+  g_slist_foreach (node->articles,
+                   (GFunc) pdb_trie_article_free,
+                   trie);
+  g_slist_free (node->articles);
+
+  g_slice_free (PdbTrieNode, node);
 }
 
 void
 pdb_trie_free (PdbTrie *trie)
 {
-  g_slist_foreach (trie->children, (GFunc) pdb_trie_free, NULL);
-  g_slist_free (trie->children);
-
-  g_slist_foreach (trie->articles,
-                   (GFunc) pdb_trie_article_free,
-                   NULL);
-  g_slist_free (trie->articles);
-
+  pdb_trie_free_node (trie->root, trie);
   g_slice_free (PdbTrie, trie);
 }
 
 gboolean
 pdb_trie_is_empty (PdbTrie *trie)
 {
-  return trie->children == NULL;
+  return trie->root->children == NULL;
 }

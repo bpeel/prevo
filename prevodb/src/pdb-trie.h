@@ -22,15 +22,23 @@
 
 typedef struct _PdbTrie PdbTrie;
 
+typedef void (* PdbTrieFreeDataCb) (void *data,
+                                    void *user_data);
+typedef void (* PdbTrieGetReferenceCb) (void *data,
+                                        int *article_num,
+                                        int *mark_num,
+                                        void *user_data);
+
 PdbTrie *
-pdb_trie_new (void);
+pdb_trie_new (PdbTrieFreeDataCb free_data_cb,
+              PdbTrieGetReferenceCb get_reference_cb,
+              void *user_data);
 
 void
 pdb_trie_add_word (PdbTrie *trie,
                    const char *word,
                    const char *display_representation,
-                   int article_num,
-                   int mark_num);
+                   void *data);
 
 void
 pdb_trie_compress (PdbTrie *trie,

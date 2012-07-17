@@ -80,12 +80,16 @@ typedef struct
 
 typedef struct
 {
+  int section_num;
+
   PdbDbSpannableString title;
   PdbDbSpannableString text;
 } PdbDbSection;
 
 typedef struct
 {
+  int article_num;
+
   PdbDbSpannableString title;
 
   /* A list of PdbDbSections */
@@ -102,8 +106,8 @@ typedef struct
 
 typedef struct
 {
-  int article_num;
-  int mark_num;
+  PdbDbArticle *article;
+  PdbDbSection *section;
 } PdbDbMark;
 
 struct _PdbDb
@@ -123,13 +127,14 @@ static void
 pdb_db_add_index_entry (PdbDb *db,
                         const char *lang,
                         const char *name,
-                        int article_num,
-                        int mark_num)
+                        PdbDbArticle *article,
+                        PdbDbSection *section)
 {
   PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
 
   if (trie)
     {
+      PdbDbMark *mark = g_slice_new (PdbDbMark);
       const char *p;
 
       /* Check if any of the characters in the name are upper case */
@@ -140,6 +145,9 @@ pdb_db_add_index_entry (PdbDb *db,
           if (g_unichar_isupper (ch))
             break;
         }
+
+      mark->article = article;
+      mark->section = section;
 
       /* If we found an uppercase character then we'll additionally
        * add a lower case representation of the name so that the
@@ -157,8 +165,7 @@ pdb_db_add_index_entry (PdbDb *db,
           pdb_trie_add_word (trie,
                              buf->str,
                              name,
-                             article_num,
-                             mark_num);
+                             mark);
 
           g_string_free (buf, TRUE);
         }
@@ -167,8 +174,7 @@ pdb_db_add_index_entry (PdbDb *db,
           pdb_trie_add_word (trie,
                              name,
                              NULL,
-                             article_num,
-                             mark_num);
+                             mark);
         }
     }
 }
@@ -279,6 +285,24 @@ pdb_db_resolve_references (PdbDb *db)
 {
   int article_num;
 
+  /* Calculate the article and section numbers */
+  for (article_num = 0; article_num < db->articles->len; article_num++)
+    {
+      PdbDbArticle *article = g_ptr_array_index (db->articles, article_num);
+      GList *l;
+      int section_num;
+
+      article->article_num = article_num;
+      for (section_num = 0, l = article->sections;
+           l;
+           section_num++, l = l->next)
+        {
+          PdbDbSection *section = l->data;
+          section->section_num = section_num;
+        }
+    }
+
+  /* Resolve all of the references */
   for (article_num = 0; article_num < db->articles->len; article_num++)
     {
       PdbDbArticle *article = g_ptr_array_index (db->articles, article_num);
@@ -293,8 +317,8 @@ pdb_db_resolve_references (PdbDb *db)
 
           if (mark)
             {
-              ref->span->data1 = mark->article_num;
-              ref->span->data2 = mark->mark_num;
+              ref->span->data1 = mark->article->article_num;
+              ref->span->data2 = mark->section->section_num;
             }
           else
             {
@@ -416,8 +440,8 @@ pdb_doc_parse_spannable_string (PdbDb *db,
 static void
 pdb_db_add_kap_index (PdbDb *db,
                       PdbDocElementNode *kap,
-                      int article_num,
-                      int mark_num)
+                      PdbDbArticle *article,
+                      PdbDbSection *section)
 {
   GString *buf = g_string_new (NULL);
   PdbDocNode *node;
@@ -443,13 +467,14 @@ pdb_db_add_kap_index (PdbDb *db,
       }
 
   pdb_db_trim_buf (buf);
-  pdb_db_add_index_entry (db, "eo", buf->str, article_num, mark_num);
+  pdb_db_add_index_entry (db, "eo", buf->str, article, section);
 
   g_string_free (buf, TRUE);
 }
 
 static PdbDbSection *
 pdb_db_parse_drv (PdbDb *db,
+                  PdbDbArticle *article,
                   PdbDocElementNode *root_node,
                   GError **error)
 {
@@ -468,9 +493,9 @@ pdb_db_parse_drv (PdbDb *db,
       return NULL;
     }
 
-  pdb_db_add_kap_index (db, kap, db->articles->len, 0);
-
   section = g_slice_new (PdbDbSection);
+
+  pdb_db_add_kap_index (db, kap, article, section);
 
   if (pdb_doc_parse_spannable_string (db, kap, &section->title, error))
     {
@@ -497,6 +522,7 @@ pdb_db_parse_drv (PdbDb *db,
 
 static gboolean
 pdb_db_parse_subart (PdbDb *db,
+                     PdbDbArticle *article,
                      PdbDocElementNode *root_node,
                      GQueue *sections,
                      GError **error)
@@ -512,7 +538,7 @@ pdb_db_parse_subart (PdbDb *db,
           {
             PdbDbSection *section;
 
-            section = pdb_db_parse_drv (db, element, error);
+            section = pdb_db_parse_drv (db, article, element, error);
 
             if (section == NULL)
               return FALSE;
@@ -574,7 +600,7 @@ pdb_db_parse_article (PdbDb *db,
               {
                 PdbDbSection *section;
 
-                section = pdb_db_parse_drv (db, element, error);
+                section = pdb_db_parse_drv (db, article, element, error);
 
                 if (section == NULL)
                   result = FALSE;
@@ -583,7 +609,11 @@ pdb_db_parse_article (PdbDb *db,
               }
             else if (!strcmp (element->name, "subart"))
               {
-                if (!pdb_db_parse_subart (db, element, &sections, error))
+                if (!pdb_db_parse_subart (db,
+                                          article,
+                                          element,
+                                          &sections,
+                                          error))
                   result = FALSE;
               }
           }
@@ -635,21 +665,45 @@ pdb_db_parse_articles (PdbDb *db,
   return TRUE;
 }
 
+static void
+pdb_db_free_data_cb (void *data,
+                     void *user_data)
+{
+  g_slice_free (PdbDbMark, data);
+}
+
+static void
+pdb_db_get_reference_cb (void *data,
+                         int *article_num,
+                         int *mark_num,
+                         void *user_data)
+{
+  PdbDbMark *mark = data;
+
+  *article_num = mark->article->article_num;
+  *mark_num = mark->section->section_num;
+}
+
 PdbDb *
 pdb_db_new (PdbRevo *revo,
             GError **error)
 {
   PdbDb *db;
-  PdbLang *lang;
   char **files;
 
-  lang = pdb_lang_new (revo, error);
-
-  if (lang == NULL)
-    return NULL;
-
   db = g_slice_new (PdbDb);
-  db->lang = lang;
+
+  db->lang = pdb_lang_new (revo,
+                           pdb_db_free_data_cb,
+                           pdb_db_get_reference_cb,
+                           db,
+                           error);
+
+  if (db->lang == NULL)
+    {
+      g_slice_free (PdbDb, db);
+      return NULL;
+    }
 
   db->articles = g_ptr_array_new ();
 

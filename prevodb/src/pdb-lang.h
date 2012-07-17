@@ -27,6 +27,9 @@ typedef struct _PdbLang PdbLang;
 
 PdbLang *
 pdb_lang_new (PdbRevo *revo,
+              PdbTrieFreeDataCb free_data_cb,
+              PdbTrieGetReferenceCb get_reference_cb,
+              void *user_data,
               GError **error);
 
 PdbTrie *

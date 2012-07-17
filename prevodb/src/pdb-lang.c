@@ -46,6 +46,10 @@ struct _PdbLang
   GString *name_buf;
   GString *code_buf;
   gboolean in_lingvo;
+
+  PdbTrieFreeDataCb free_data_cb;
+  PdbTrieGetReferenceCb get_reference_cb;
+  void *user_data;
 };
 
 static void
@@ -94,7 +98,9 @@ pdb_lang_end_element_cb (void *user_data,
                           lang->languages->len - 1);
   entry->name = g_strdup (lang->name_buf->str);
   entry->code = g_strdup (lang->code_buf->str);
-  entry->trie = pdb_trie_new ();
+  entry->trie = pdb_trie_new (lang->free_data_cb,
+                              lang->get_reference_cb,
+                              lang->user_data);
 }
 
 static int
@@ -137,6 +143,9 @@ pdb_lang_init_hash_table (PdbLang *lang)
 
 PdbLang *
 pdb_lang_new (PdbRevo *revo,
+              PdbTrieFreeDataCb free_data_cb,
+              PdbTrieGetReferenceCb get_reference_cb,
+              void *user_data,
               GError **error)
 {
   PdbLang *lang = g_slice_new (PdbLang);
@@ -148,6 +157,10 @@ pdb_lang_new (PdbRevo *revo,
   lang->name_buf = g_string_new (NULL);
   lang->code_buf = g_string_new (NULL);
   lang->hash_table = g_hash_table_new (g_str_hash, g_str_equal);
+
+  lang->free_data_cb = free_data_cb;
+  lang->get_reference_cb = get_reference_cb;
+  lang->user_data = user_data;
 
   pdb_xml_set_user_data (lang->parser, lang);
 
