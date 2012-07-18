@@ -24,6 +24,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -159,10 +160,25 @@ public class ArticleActivity extends Activity
     layout.setOrientation (LinearLayout.VERTICAL);
 
     SpannableString str;
+    boolean isTitle = true;
+    LayoutInflater layoutInflater = getLayoutInflater ();
 
     while ((str = maybeReadSpannableString (in)) != null)
       {
-        TextView tv = new TextView (this);
+        TextView tv;
+
+        if (isTitle)
+          {
+            tv = (TextView) layoutInflater.inflate (R.layout.section_header,
+                                                    layout,
+                                                    false);
+            isTitle = false;
+          }
+        else
+          {
+            tv = new TextView (this);
+            isTitle = true;
+          }
 
         tv.setText (str, TextView.BufferType.SPANNABLE);
 
