@@ -23,6 +23,9 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.SpannableString;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
+import android.text.style.SuperscriptSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.widget.LinearLayout;
@@ -129,9 +132,39 @@ public class ArticleActivity extends Activity
     SpannableString string =
       new SpannableString (new String (utf8String, utf8Charset));
 
-    while (readShort (in) != 0)
-      if (in.read () == -1)
-        throwEOF ();
+    int spanLength;
+
+    while ((spanLength = readShort (in)) != 0)
+      {
+        int spanStart = readShort (in);
+        int data1 = readShort (in);
+        int data2 = readShort (in);
+        int spanType = in.read ();
+
+        if (spanType == -1)
+          throwEOF ();
+
+        switch (spanType)
+          {
+          case 1:
+            string.setSpan (new SuperscriptSpan (),
+                            spanStart,
+                            spanStart + spanLength,
+                            0 /* flags */);
+            string.setSpan (new RelativeSizeSpan (0.5f),
+                            spanStart,
+                            spanStart + spanLength,
+                            0 /* flags */);
+            break;
+
+          case 2:
+            string.setSpan (new StyleSpan (android.graphics.Typeface.ITALIC),
+                            spanStart,
+                            spanStart + spanLength,
+                            0 /* flags */);
+            break;
+          }
+      }
 
     return string;
   }
