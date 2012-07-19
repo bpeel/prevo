@@ -26,6 +26,7 @@
 #include "pdb-error.h"
 #include "pdb-doc.h"
 #include "pdb-mkdir.h"
+#include "pdb-error.h"
 
 /* The article file format is a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
@@ -100,14 +101,6 @@ typedef struct
 
   /* A list of PdbDbSections */
   GList *sections;
-
-  /* This is a list of references. Each reference contains the
-   * original reference id from the XML file and a pointer to the
-   * span. The data in the span will be replaced by an article and
-   * mark number as a post-processing step once all of the articles
-   * have been read so that the references can be resolved. The
-   * references are sorted by the offset */
-  GList *references;
 } PdbDbArticle;
 
 typedef struct
@@ -127,6 +120,14 @@ struct _PdbDb
   char *word_root;
 
   GHashTable *marks;
+
+  /* This is a list of references. Each reference contains the
+   * original reference id from the XML file and a pointer to the
+   * span. The data in the span will be replaced by an article and
+   * mark number as a post-processing step once all of the articles
+   * have been read so that the references can be resolved. The
+   * references are sorted by the offset */
+  GList *references;
 };
 
 static void
@@ -248,17 +249,15 @@ pdb_db_reference_free (PdbDbReference *ref)
 }
 
 static void
-pdb_db_free_span_cb (void *ptr,
-                     void *user_data)
+pdb_db_span_free (PdbDbSpan *span)
 {
-  PdbDbSpan *span = ptr;
   g_slice_free (PdbDbSpan, span);
 }
 
 static void
 pdb_db_free_span_list (GList *spans)
 {
-  g_list_foreach (spans, pdb_db_free_span_cb, NULL);
+  g_list_foreach (spans, (GFunc) pdb_db_span_free, NULL);
   g_list_free (spans);
 }
 
@@ -290,12 +289,12 @@ static void
 pdb_db_resolve_references (PdbDb *db)
 {
   int article_num;
+  GList *l;
 
   /* Calculate the article and section numbers */
   for (article_num = 0; article_num < db->articles->len; article_num++)
     {
       PdbDbArticle *article = g_ptr_array_index (db->articles, article_num);
-      GList *l;
       int section_num;
 
       article->article_num = article_num;
@@ -309,32 +308,23 @@ pdb_db_resolve_references (PdbDb *db)
     }
 
   /* Resolve all of the references */
-  for (article_num = 0; article_num < db->articles->len; article_num++)
+  for (l = db->references; l; l = l->next)
     {
-      PdbDbArticle *article = g_ptr_array_index (db->articles, article_num);
-      GList *rl, *next;
+      PdbDbReference *ref = l->data;
+      PdbDbMark *mark = g_hash_table_lookup (db->marks, ref->name);
 
-      for (rl = article->references; rl; rl = next)
+      if (mark)
         {
-          PdbDbReference *ref = rl->data;
-          PdbDbMark *mark = g_hash_table_lookup (db->marks, ref->name);
-
-          next = rl->next;
-
-          if (mark)
-            {
-              ref->span->data1 = mark->article->article_num;
-              ref->span->data2 = mark->section->section_num;
-            }
-          else
-            {
-              fprintf (stderr,
-                       "no mark found for reference \"%s\"\n",
-                       ref->name);
-              pdb_db_reference_free (ref);
-              article->references =
-                g_list_delete_link (article->references, rl);
-            }
+          ref->span->data1 = mark->article->article_num;
+          ref->span->data2 = mark->section->section_num;
+        }
+      else
+        {
+          ref->span->data1 = 0;
+          ref->span->data2 = 0;
+          fprintf (stderr,
+                   "no mark found for reference \"%s\"\n",
+                   ref->name);
         }
     }
 }
@@ -399,10 +389,11 @@ pdb_db_parse_push_add_paragraph (PdbDbParseState *state)
   return pdb_db_parse_push_entry (state, PDB_DB_STACK_ADD_PARAGRAPH);
 }
 
-typedef void (* PdbDbElementHandler) (PdbDb *db,
-                                      PdbDbParseState *state,
-                                      PdbDocElementNode *element,
-                                      PdbDbSpan *span);
+typedef gboolean (* PdbDbElementHandler) (PdbDb *db,
+                                          PdbDbParseState *state,
+                                          PdbDocElementNode *element,
+                                          PdbDbSpan *span,
+                                          GError **error);
 
 typedef struct
 {
@@ -422,11 +413,41 @@ pdb_db_start_text (PdbDbParseState *state)
     }
 }
 
-static void
+static gboolean
+pdb_db_handle_ref (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocElementNode *element,
+                   PdbDbSpan *span,
+                   GError **error)
+{
+  PdbDbReference *reference;
+  char **att;
+
+  for (att = element->atts; att[0]; att += 2)
+    if (!strcmp (att[0], "cel"))
+      goto found_cel;
+
+  g_set_error (error,
+               PDB_ERROR,
+               PDB_ERROR_BAD_FORMAT,
+               "<ref> tag found with a cel attribute");
+  return FALSE;
+
+ found_cel:
+  reference = g_slice_new (PdbDbReference);
+  reference->span = span;
+  reference->name = g_strdup (att[1]);
+  db->references = g_list_prepend (db->references, reference);
+
+  return TRUE;
+}
+
+static gboolean
 pdb_db_handle_snc (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
-                   PdbDbSpan *span)
+                   PdbDbSpan *span,
+                   GError **error)
 {
   int sence_num = 0;
   PdbDocNode *n;
@@ -451,12 +472,14 @@ pdb_db_handle_snc (PdbDb *db,
             !strcmp (((PdbDocElementNode *) n)->name, "snc"))
           goto multiple_sences;
 
-      return;
+      return TRUE;
     }
 
  multiple_sences:
   pdb_db_start_text (state);
   g_string_append_printf (state->buf, "%i. ", sence_num + 1);
+
+  return TRUE;
 }
 
 static PdbDbElementSpan
@@ -464,7 +487,8 @@ pdb_db_element_spans[] =
   {
     { "ofc", PDB_DB_SPAN_SUPERSCRIPT, NULL },
     { "ekz", PDB_DB_SPAN_ITALIC, NULL },
-    { "snc", PDB_DB_SPAN_NONE, pdb_db_handle_snc }
+    { "snc", PDB_DB_SPAN_NONE, pdb_db_handle_snc },
+    { "ref", PDB_DB_SPAN_REFERENCE, pdb_db_handle_ref }
   };
 
 static int
@@ -510,10 +534,11 @@ pdb_db_start_span (PdbDbParseState *state,
   return span;
 }
 
-static void
+static gboolean
 pdb_db_parse_node (PdbDb *db,
                    PdbDbParseState *state,
-                   PdbDocNode *node)
+                   PdbDocNode *node,
+                   GError **error)
 {
   if (node->next)
     pdb_db_parse_push_node (state, node->next);
@@ -561,11 +586,13 @@ pdb_db_parse_node (PdbDb *db,
                     else
                       span = pdb_db_start_span (state, elem_span->type);
 
-                    if (elem_span->handler)
-                      elem_span->handler (db,
-                                          state,
-                                          element,
-                                          span);
+                    if (elem_span->handler &&
+                        !elem_span->handler (db,
+                                             state,
+                                             element,
+                                             span,
+                                             error))
+                      return FALSE;
 
                     break;
                   }
@@ -602,6 +629,8 @@ pdb_db_parse_node (PdbDb *db,
       }
       break;
     }
+
+  return TRUE;
 }
 
 static gboolean
@@ -640,7 +669,8 @@ pdb_doc_parse_spannable_string (PdbDb *db,
           break;
 
         case PDB_DB_STACK_NODE:
-          pdb_db_parse_node (db, &state, this_entry.d.node);
+          if (!pdb_db_parse_node (db, &state, this_entry.d.node, error))
+            goto error;
           break;
         }
     }
@@ -652,6 +682,13 @@ pdb_doc_parse_spannable_string (PdbDb *db,
   g_array_free (state.stack, TRUE);
 
   return TRUE;
+
+ error:
+  g_array_free (state.stack, TRUE);
+  g_string_free (state.buf, TRUE);
+  pdb_db_free_span_list (state.spans.head);
+
+  return FALSE;
 }
 
 static void
@@ -689,6 +726,43 @@ pdb_db_add_kap_index (PdbDb *db,
   g_string_free (buf, TRUE);
 }
 
+static void
+pdb_db_add_mark (PdbDb *db,
+                 PdbDbArticle *article,
+                 PdbDbSection *section,
+                 const char *mark_name)
+{
+  PdbDbMark *mark = g_slice_new (PdbDbMark);
+
+  mark->article = article;
+  mark->section = section;
+
+  g_hash_table_insert (db->marks,
+                       g_strdup (mark_name),
+                       mark);
+}
+
+static void
+pdb_db_add_marks (PdbDb *db,
+                  PdbDbArticle *article,
+                  PdbDbSection *section,
+                  PdbDocElementNode *element)
+{
+  char **att;
+  PdbDocNode *node;
+
+  for (att = element->atts; att[0]; att += 2)
+    if (!strcmp (att[0], "mrk"))
+      {
+        pdb_db_add_mark (db, article, section, att[1]);
+        break;
+      }
+
+  for (node = element->node.first_child; node; node = node->next)
+    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
+      pdb_db_add_marks (db, article, section, (PdbDocElementNode *) node);
+}
+
 static PdbDbSection *
 pdb_db_parse_drv (PdbDb *db,
                   PdbDbArticle *article,
@@ -711,6 +785,8 @@ pdb_db_parse_drv (PdbDb *db,
     }
 
   section = g_slice_new (PdbDbSection);
+
+  pdb_db_add_marks (db, article, section, root_node);
 
   pdb_db_add_kap_index (db, kap, article, section);
 
@@ -1005,12 +1081,13 @@ pdb_db_free (PdbDb *db)
 
       pdb_db_destroy_spannable_string (&article->title);
       pdb_db_free_section_list (article->sections);
-      pdb_db_free_reference_list (article->references);
 
       g_slice_free (PdbDbArticle, article);
     }
 
   g_ptr_array_free (db->articles, TRUE);
+
+  pdb_db_free_reference_list (db->references);
 
   g_hash_table_destroy (db->marks);
 
