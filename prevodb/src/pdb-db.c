@@ -711,10 +711,10 @@ pdb_db_parse_node (PdbDb *db,
 }
 
 static gboolean
-pdb_doc_parse_spannable_string (PdbDb *db,
-                                PdbDocElementNode *root_element,
-                                PdbDbSpannableString *string,
-                                GError **error)
+pdb_db_parse_spannable_string (PdbDb *db,
+                               PdbDocElementNode *root_element,
+                               PdbDbSpannableString *string,
+                               GError **error)
 {
   PdbDbParseState state;
 
@@ -872,12 +872,12 @@ pdb_db_parse_drv (PdbDb *db,
 
   pdb_db_add_kap_index (db, kap, article, section);
 
-  if (pdb_doc_parse_spannable_string (db, kap, &section->title, error))
+  if (pdb_db_parse_spannable_string (db, kap, &section->title, error))
     {
-      if (!pdb_doc_parse_spannable_string (db,
-                                           root_node,
-                                           &section->text,
-                                           error))
+      if (!pdb_db_parse_spannable_string (db,
+                                          root_node,
+                                          &section->text,
+                                          error))
         result = FALSE;
 
       if (!result)
@@ -962,7 +962,7 @@ pdb_db_parse_article (PdbDb *db,
 
   article = g_slice_new (PdbDbArticle);
 
-  if (pdb_doc_parse_spannable_string (db, kap, &article->title, error))
+  if (pdb_db_parse_spannable_string (db, kap, &article->title, error))
     {
       PdbDocNode *node;
 
