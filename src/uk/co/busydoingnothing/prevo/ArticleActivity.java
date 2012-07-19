@@ -25,6 +25,7 @@ import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.text.style.QuoteSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.text.style.SuperscriptSpan;
@@ -192,6 +193,20 @@ public class ArticleActivity extends Activity
 
           case 2:
             string.setSpan (new StyleSpan (android.graphics.Typeface.ITALIC),
+                            spanStart,
+                            spanStart + spanLength,
+                            0 /* flags */);
+            break;
+
+          case 3:
+            string.setSpan (new QuoteSpan (),
+                            spanStart,
+                            spanStart + spanLength,
+                            0 /* flags */);
+            break;
+
+          case 4:
+            string.setSpan (new StyleSpan (android.graphics.Typeface.BOLD),
                             spanStart,
                             spanStart + spanLength,
                             0 /* flags */);

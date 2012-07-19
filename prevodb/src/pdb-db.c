@@ -56,6 +56,8 @@ typedef enum
   PDB_DB_SPAN_REFERENCE,
   PDB_DB_SPAN_SUPERSCRIPT,
   PDB_DB_SPAN_ITALIC,
+  PDB_DB_SPAN_NOTE,
+  PDB_DB_SPAN_BOLD,
   PDB_DB_SPAN_NONE
 } PdbDbSpanType;
 
@@ -333,7 +335,8 @@ typedef enum
 {
   PDB_DB_STACK_NODE,
   PDB_DB_STACK_CLOSE_SPAN,
-  PDB_DB_STACK_ADD_PARAGRAPH
+  PDB_DB_STACK_ADD_PARAGRAPH,
+  PDB_DB_STACK_CLOSING_CHARACTER
 } PdbDbStackType;
 
 typedef struct
@@ -344,6 +347,7 @@ typedef struct
   {
     PdbDocNode *node;
     PdbDbSpan *span;
+    gunichar character;
   } d;
 } PdbDbParseStackEntry;
 
@@ -389,6 +393,18 @@ pdb_db_parse_push_add_paragraph (PdbDbParseState *state)
   return pdb_db_parse_push_entry (state, PDB_DB_STACK_ADD_PARAGRAPH);
 }
 
+static PdbDbParseStackEntry *
+pdb_db_parse_push_closing_character (PdbDbParseState *state,
+                                     gunichar ch)
+{
+  PdbDbParseStackEntry *entry =
+    pdb_db_parse_push_entry (state, PDB_DB_STACK_CLOSING_CHARACTER);
+
+  entry->d.character = ch;
+
+  return entry;
+}
+
 typedef gboolean (* PdbDbElementHandler) (PdbDb *db,
                                           PdbDbParseState *state,
                                           PdbDocElementNode *element,
@@ -400,6 +416,7 @@ typedef struct
   const char *name;
   PdbDbSpanType type;
   PdbDbElementHandler handler;
+  gboolean paragraph;
 } PdbDbElementSpan;
 
 static void
@@ -411,6 +428,65 @@ pdb_db_start_text (PdbDbParseState *state)
         g_string_append (state->buf, "\n\n");
       state->paragraph_queued = FALSE;
     }
+}
+
+static int
+pdb_db_get_utf16_length (const char *buf)
+{
+  int length = 0;
+
+  /* Calculates the length that the string would have if it was
+   * encoded in UTF-16 */
+  for (; *buf; buf = g_utf8_next_char (buf))
+    {
+      gunichar ch = g_utf8_get_char (buf);
+
+      length++;
+      /* If the character is outside the BMP then it
+       * will need an extra 16 bit number to encode
+       * it */
+      if (ch >= 0x10000)
+        length++;
+    }
+
+  return length;
+}
+
+static gboolean
+pdb_db_handle_aut (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocElementNode *element,
+                   PdbDbSpan *span,
+                   GError **error)
+{
+  pdb_db_start_text (state);
+  g_string_append (state->buf, "[");
+  pdb_db_parse_push_closing_character (state, ']');
+
+  return TRUE;
+}
+
+static gboolean
+pdb_db_handle_rim (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocElementNode *element,
+                   PdbDbSpan *span,
+                   GError **error)
+{
+  PdbDbSpan *bold_span = g_slice_new0 (PdbDbSpan);
+
+  pdb_db_start_text (state);
+
+  bold_span->type = PDB_DB_SPAN_BOLD;
+  bold_span->span_start = pdb_db_get_utf16_length (state->buf->str);
+
+  g_string_append (state->buf, "Rim. ");
+
+  bold_span->span_length = (pdb_db_get_utf16_length (state->buf->str) -
+                            bold_span->span_start);
+  g_queue_push_tail (&state->spans, bold_span);
+
+  return TRUE;
 }
 
 static gboolean
@@ -452,11 +528,6 @@ pdb_db_handle_snc (PdbDb *db,
   int sence_num = 0;
   PdbDocNode *n;
 
-  /* Make sure there is a paragraph separator before and after the
-   * sence */
-  state->paragraph_queued = TRUE;
-  pdb_db_parse_push_add_paragraph (state);
-
   /* Count the sncs before this one */
   for (n = element->node.prev; n; n = n->prev)
     if (n->type == PDB_DOC_NODE_TYPE_ELEMENT &&
@@ -485,33 +556,28 @@ pdb_db_handle_snc (PdbDb *db,
 static PdbDbElementSpan
 pdb_db_element_spans[] =
   {
-    { "ofc", PDB_DB_SPAN_SUPERSCRIPT, NULL },
-    { "ekz", PDB_DB_SPAN_ITALIC, NULL },
-    { "snc", PDB_DB_SPAN_NONE, pdb_db_handle_snc },
-    { "ref", PDB_DB_SPAN_REFERENCE, pdb_db_handle_ref }
-  };
-
-static int
-pdb_db_get_utf16_length (const char *buf)
-{
-  int length = 0;
-
-  /* Calculates the length that the string would have if it was
-   * encoded in UTF-16 */
-  for (; *buf; buf = g_utf8_next_char (buf))
+    { .name = "ofc", .type = PDB_DB_SPAN_SUPERSCRIPT },
+    { .name = "ekz", .type = PDB_DB_SPAN_ITALIC },
     {
-      gunichar ch = g_utf8_get_char (buf);
-
-      length++;
-      /* If the character is outside the BMP then it
-       * will need an extra 16 bit number to encode
-       * it */
-      if (ch >= 0x10000)
-        length++;
-    }
-
-  return length;
-}
+      .name = "snc",
+      .type = PDB_DB_SPAN_NONE,
+      .handler = pdb_db_handle_snc,
+      .paragraph = TRUE
+    },
+    {
+      .name = "ref",
+      .type = PDB_DB_SPAN_REFERENCE,
+      .handler = pdb_db_handle_ref
+    },
+    {
+      .name = "rim",
+      .type = PDB_DB_SPAN_NOTE,
+      .handler = pdb_db_handle_rim,
+      .paragraph = TRUE
+    },
+    { .name = "em", .type = PDB_DB_SPAN_BOLD, },
+    { .name = "aut", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_aut },
+  };
 
 static PdbDbSpan *
 pdb_db_start_span (PdbDbParseState *state,
@@ -581,10 +647,21 @@ pdb_db_parse_node (PdbDb *db,
                   {
                     PdbDbSpan *span;
 
+                    if (elem_span->paragraph)
+                      {
+                        /* Make sure there is a paragraph separator
+                         * before and after the remark */
+                        state->paragraph_queued = TRUE;
+                        pdb_db_parse_push_add_paragraph (state);
+                      }
+
                     if (elem_span->type == PDB_DB_SPAN_NONE)
                       span = NULL;
                     else
-                      span = pdb_db_start_span (state, elem_span->type);
+                      {
+                        pdb_db_start_text (state);
+                        span = pdb_db_start_span (state, elem_span->type);
+                      }
 
                     if (elem_span->handler &&
                         !elem_span->handler (db,
@@ -666,6 +743,11 @@ pdb_doc_parse_spannable_string (PdbDb *db,
 
         case PDB_DB_STACK_ADD_PARAGRAPH:
           state.paragraph_queued = TRUE;
+          break;
+
+        case PDB_DB_STACK_CLOSING_CHARACTER:
+          pdb_db_start_text (&state);
+          g_string_append_unichar (state.buf, this_entry.d.character);
           break;
 
         case PDB_DB_STACK_NODE:
