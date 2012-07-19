@@ -45,11 +45,16 @@
  * The subsequent strings are in pairs where the first string is the
  * title for the section and the second string is the content. There
  * can be sections with an empty title.
+ *
+ * The length and string offset are counted in 16-bit units as if the
+ * string was encoded in UTF-16.
  */
 
 typedef enum
 {
-  PDB_DB_SPAN_REFERENCE
+  PDB_DB_SPAN_REFERENCE,
+  PDB_DB_SPAN_SUPERSCRIPT,
+  PDB_DB_SPAN_ITALIC
 } PdbDbSpanType;
 
 typedef struct
@@ -336,6 +341,7 @@ pdb_db_resolve_references (PdbDb *db)
 typedef struct
 {
   PdbDocNode *node;
+  PdbDbSpan *span;
 } PdbDbParseStackEntry;
 
 static PdbDbParseStackEntry *
@@ -348,8 +354,44 @@ pdb_doc_parse_push_node (GArray *stack,
   entry = &g_array_index (stack, PdbDbParseStackEntry, stack->len - 1);
 
   entry->node = node;
+  entry->span = NULL;
 
   return entry;
+}
+
+typedef struct
+{
+  const char *name;
+  PdbDbSpanType type;
+} PdbDbElementSpan;
+
+static PdbDbElementSpan
+pdb_db_element_spans[] =
+  {
+    { "ofc", PDB_DB_SPAN_SUPERSCRIPT },
+    { "ekz", PDB_DB_SPAN_ITALIC }
+  };
+
+static int
+pdb_db_get_utf16_length (const char *buf)
+{
+  int length = 0;
+
+  /* Calculates the length that the string would have if it was
+   * encoded in UTF-16 */
+  for (; *buf; buf = g_utf8_next_char (buf))
+    {
+      gunichar ch = g_utf8_get_char (buf);
+
+      length++;
+      /* If the character is outside the BMP then it
+       * will need an extra 16 bit number to encode
+       * it */
+      if (ch >= 0x10000)
+        length++;
+    }
+
+  return length;
 }
 
 static gboolean
@@ -372,6 +414,13 @@ pdb_doc_parse_spannable_string (PdbDb *db,
         g_array_index (stack, PdbDbParseStackEntry, stack->len - 1);
 
       g_array_set_size (stack, stack->len - 1);
+
+      if (this_entry.span)
+        {
+          this_entry.span->span_length =
+            pdb_db_get_utf16_length (buf->str) - this_entry.span->span_start;
+          continue;
+        }
 
       if (this_entry.node->next)
         pdb_doc_parse_push_node (stack, this_entry.node->next);
@@ -402,7 +451,27 @@ pdb_doc_parse_spannable_string (PdbDb *db,
                 /* FIXME: do something here */
               }
             else if (element->node.first_child)
-              pdb_doc_parse_push_node (stack, element->node.first_child);
+              {
+                int i;
+
+                for (i = 0; i < G_N_ELEMENTS (pdb_db_element_spans); i++)
+                  if (!strcmp (pdb_db_element_spans[i].name, element->name))
+                    {
+                      PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
+
+                      span->span_start = pdb_db_get_utf16_length (buf->str);
+                      span->type = pdb_db_element_spans[i].type;
+
+                      g_queue_push_tail (&spans, span);
+                      /* Push the span onto the stack so that we can
+                       * fill in the span length once all of the child
+                       * nodes have been processed */
+                      pdb_doc_parse_push_node (stack, NULL)->span = span;
+                      break;
+                    }
+
+                pdb_doc_parse_push_node (stack, element->node.first_child);
+              }
           }
           break;
 
