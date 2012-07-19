@@ -54,7 +54,8 @@ typedef enum
 {
   PDB_DB_SPAN_REFERENCE,
   PDB_DB_SPAN_SUPERSCRIPT,
-  PDB_DB_SPAN_ITALIC
+  PDB_DB_SPAN_ITALIC,
+  PDB_DB_SPAN_NONE
 } PdbDbSpanType;
 
 typedef struct
@@ -338,38 +339,132 @@ pdb_db_resolve_references (PdbDb *db)
     }
 }
 
+typedef enum
+{
+  PDB_DB_STACK_NODE,
+  PDB_DB_STACK_CLOSE_SPAN,
+  PDB_DB_STACK_ADD_PARAGRAPH
+} PdbDbStackType;
+
 typedef struct
 {
-  PdbDocNode *node;
-  PdbDbSpan *span;
+  PdbDbStackType type;
+
+  union
+  {
+    PdbDocNode *node;
+    PdbDbSpan *span;
+  } d;
 } PdbDbParseStackEntry;
 
+typedef struct
+{
+  GArray *stack;
+  GString *buf;
+  GQueue spans;
+  gboolean paragraph_queued;
+} PdbDbParseState;
+
 static PdbDbParseStackEntry *
-pdb_doc_parse_push_node (GArray *stack,
-                         PdbDocNode *node)
+pdb_db_parse_push_entry (PdbDbParseState *state,
+                         PdbDbStackType type)
 {
   PdbDbParseStackEntry *entry;
 
-  g_array_set_size (stack, stack->len + 1);
-  entry = &g_array_index (stack, PdbDbParseStackEntry, stack->len - 1);
+  g_array_set_size (state->stack, state->stack->len + 1);
+  entry = &g_array_index (state->stack,
+                          PdbDbParseStackEntry,
+                          state->stack->len - 1);
 
-  entry->node = node;
-  entry->span = NULL;
+  entry->type = type;
 
   return entry;
 }
+
+static PdbDbParseStackEntry *
+pdb_db_parse_push_node (PdbDbParseState *state,
+                        PdbDocNode *node)
+{
+  PdbDbParseStackEntry *entry =
+    pdb_db_parse_push_entry (state, PDB_DB_STACK_NODE);
+
+  entry->d.node = node;
+
+  return entry;
+}
+
+static PdbDbParseStackEntry *
+pdb_db_parse_push_add_paragraph (PdbDbParseState *state)
+{
+  return pdb_db_parse_push_entry (state, PDB_DB_STACK_ADD_PARAGRAPH);
+}
+
+typedef void (* PdbDbElementHandler) (PdbDb *db,
+                                      PdbDbParseState *state,
+                                      PdbDocElementNode *element,
+                                      PdbDbSpan *span);
 
 typedef struct
 {
   const char *name;
   PdbDbSpanType type;
+  PdbDbElementHandler handler;
 } PdbDbElementSpan;
+
+static void
+pdb_db_start_text (PdbDbParseState *state)
+{
+  if (state->paragraph_queued)
+    {
+      if (state->buf->len > 0)
+        g_string_append (state->buf, "\n\n");
+      state->paragraph_queued = FALSE;
+    }
+}
+
+static void
+pdb_db_handle_snc (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocElementNode *element,
+                   PdbDbSpan *span)
+{
+  int sence_num = 0;
+  PdbDocNode *n;
+
+  /* Make sure there is a paragraph separator before and after the
+   * sence */
+  state->paragraph_queued = TRUE;
+  pdb_db_parse_push_add_paragraph (state);
+
+  /* Count the sncs before this one */
+  for (n = element->node.prev; n; n = n->prev)
+    if (n->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+        !strcmp (((PdbDocElementNode *) n)->name, "snc"))
+      sence_num++;
+
+  /* Check if this is the only sence. In that case we don't need to do
+   * anything */
+  if (sence_num == 0)
+    {
+      for (n = element->node.next; n; n = n->next)
+        if (n->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+            !strcmp (((PdbDocElementNode *) n)->name, "snc"))
+          goto multiple_sences;
+
+      return;
+    }
+
+ multiple_sences:
+  pdb_db_start_text (state);
+  g_string_append_printf (state->buf, "%i. ", sence_num + 1);
+}
 
 static PdbDbElementSpan
 pdb_db_element_spans[] =
   {
-    { "ofc", PDB_DB_SPAN_SUPERSCRIPT },
-    { "ekz", PDB_DB_SPAN_ITALIC }
+    { "ofc", PDB_DB_SPAN_SUPERSCRIPT, NULL },
+    { "ekz", PDB_DB_SPAN_ITALIC, NULL },
+    { "snc", PDB_DB_SPAN_NONE, pdb_db_handle_snc }
   };
 
 static int
@@ -394,114 +489,167 @@ pdb_db_get_utf16_length (const char *buf)
   return length;
 }
 
+static PdbDbSpan *
+pdb_db_start_span (PdbDbParseState *state,
+                   PdbDbSpanType type)
+{
+  PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
+  PdbDbParseStackEntry *entry;
+
+  span->span_start =
+    pdb_db_get_utf16_length (state->buf->str);
+  span->type = type;
+
+  g_queue_push_tail (&state->spans, span);
+  /* Push the span onto the state.stack so that we can
+   * fill in the span length once all of the child
+   * nodes have been processed */
+  entry = pdb_db_parse_push_entry (state, PDB_DB_STACK_CLOSE_SPAN);
+  entry->d.span = span;
+
+  return span;
+}
+
+static void
+pdb_db_parse_node (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocNode *node)
+{
+  if (node->next)
+    pdb_db_parse_push_node (state, node->next);
+
+  switch (node->type)
+    {
+    case PDB_DOC_NODE_TYPE_ELEMENT:
+      {
+        PdbDocElementNode *element = (PdbDocElementNode *) node;
+
+        if (!strcmp (element->name, "tld"))
+          pdb_db_append_tld (db, state->buf, element->atts);
+        /* Skip citations, adm tags and pictures */
+        else if (!strcmp (element->name, "fnt") ||
+                 !strcmp (element->name, "adm") ||
+                 !strcmp (element->name, "bld") ||
+                 /* Ignore kap tags. They are parsed separately
+                  * into the section headers */
+                 !strcmp (element->name, "kap"))
+          {
+          }
+        else if (!strcmp (element->name, "trd"))
+          {
+            /* FIXME: do something here */
+          }
+        else if (!strcmp (element->name, "trdgrp"))
+          {
+            /* FIXME: do something here */
+          }
+        else if (element->node.first_child)
+          {
+            int i;
+
+            for (i = 0; i < G_N_ELEMENTS (pdb_db_element_spans); i++)
+              {
+                const PdbDbElementSpan *elem_span =
+                  pdb_db_element_spans + i;
+
+                if (!strcmp (elem_span->name, element->name))
+                  {
+                    PdbDbSpan *span;
+
+                    if (elem_span->type == PDB_DB_SPAN_NONE)
+                      span = NULL;
+                    else
+                      span = pdb_db_start_span (state, elem_span->type);
+
+                    if (elem_span->handler)
+                      elem_span->handler (db,
+                                          state,
+                                          element,
+                                          span);
+
+                    break;
+                  }
+              }
+
+            pdb_db_parse_push_node (state,
+                                    element->node.first_child);
+          }
+      }
+      break;
+
+    case PDB_DOC_NODE_TYPE_TEXT:
+      {
+        PdbDocTextNode *text = (PdbDocTextNode *) node;
+        const char *p, *end;
+
+        for (p = text->data, end = text->data + text->len;
+             p < end;
+             p++)
+          {
+            if (g_ascii_isspace (*p))
+              {
+                if (state->buf->len > 0 &&
+                    state->buf->str[state->buf->len - 1] != ' ' &&
+                    state->buf->str[state->buf->len - 1] != '\n')
+                  g_string_append_c (state->buf, ' ');
+              }
+            else
+              {
+                pdb_db_start_text (state);
+                g_string_append_c (state->buf, *p);
+              }
+          }
+      }
+      break;
+    }
+}
+
 static gboolean
 pdb_doc_parse_spannable_string (PdbDb *db,
                                 PdbDocElementNode *root_element,
                                 PdbDbSpannableString *string,
                                 GError **error)
 {
-  GArray *stack = g_array_new (FALSE, FALSE, sizeof (PdbDbParseStackEntry));
-  GString *buf = g_string_new (NULL);
-  GQueue spans;
+  PdbDbParseState state;
 
-  g_queue_init (&spans);
+  state.stack = g_array_new (FALSE, FALSE, sizeof (PdbDbParseStackEntry));
+  state.buf = g_string_new (NULL);
+  state.paragraph_queued = FALSE;
 
-  pdb_doc_parse_push_node (stack, root_element->node.first_child);
+  g_queue_init (&state.spans);
 
-  while (stack->len > 0)
+  pdb_db_parse_push_node (&state, root_element->node.first_child);
+
+  while (state.stack->len > 0)
     {
       PdbDbParseStackEntry this_entry =
-        g_array_index (stack, PdbDbParseStackEntry, stack->len - 1);
+        g_array_index (state.stack, PdbDbParseStackEntry, state.stack->len - 1);
 
-      g_array_set_size (stack, stack->len - 1);
+      g_array_set_size (state.stack, state.stack->len - 1);
 
-      if (this_entry.span)
+      switch (this_entry.type)
         {
-          this_entry.span->span_length =
-            pdb_db_get_utf16_length (buf->str) - this_entry.span->span_start;
-          continue;
-        }
-
-      if (this_entry.node->next)
-        pdb_doc_parse_push_node (stack, this_entry.node->next);
-
-      switch (this_entry.node->type)
-        {
-        case PDB_DOC_NODE_TYPE_ELEMENT:
-          {
-            PdbDocElementNode *element = (PdbDocElementNode *) this_entry.node;
-
-            if (!strcmp (element->name, "tld"))
-              pdb_db_append_tld (db, buf, element->atts);
-            /* Skip citations, adm tags and pictures */
-            else if (!strcmp (element->name, "fnt") ||
-                     !strcmp (element->name, "adm") ||
-                     !strcmp (element->name, "bld") ||
-                     /* Ignore kap tags. They are parsed separately
-                      * into the section headers */
-                     !strcmp (element->name, "kap"))
-              {
-              }
-            else if (!strcmp (element->name, "trd"))
-              {
-                /* FIXME: do something here */
-              }
-            else if (!strcmp (element->name, "trdgrp"))
-              {
-                /* FIXME: do something here */
-              }
-            else if (element->node.first_child)
-              {
-                int i;
-
-                for (i = 0; i < G_N_ELEMENTS (pdb_db_element_spans); i++)
-                  if (!strcmp (pdb_db_element_spans[i].name, element->name))
-                    {
-                      PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
-
-                      span->span_start = pdb_db_get_utf16_length (buf->str);
-                      span->type = pdb_db_element_spans[i].type;
-
-                      g_queue_push_tail (&spans, span);
-                      /* Push the span onto the stack so that we can
-                       * fill in the span length once all of the child
-                       * nodes have been processed */
-                      pdb_doc_parse_push_node (stack, NULL)->span = span;
-                      break;
-                    }
-
-                pdb_doc_parse_push_node (stack, element->node.first_child);
-              }
-          }
+        case PDB_DB_STACK_CLOSE_SPAN:
+          this_entry.d.span->span_length =
+            pdb_db_get_utf16_length (state.buf->str) -
+            this_entry.d.span->span_start;
           break;
 
-        case PDB_DOC_NODE_TYPE_TEXT:
-          {
-            PdbDocTextNode *text = (PdbDocTextNode *) this_entry.node;
-            const char *p, *end;
+        case PDB_DB_STACK_ADD_PARAGRAPH:
+          state.paragraph_queued = TRUE;
+          break;
 
-            for (p = text->data, end = text->data + text->len;
-                 p < end;
-                 p++)
-              {
-                if (g_ascii_isspace (*p))
-                  {
-                    if (buf->len > 0 && buf->str[buf->len - 1] != ' ')
-                      g_string_append_c (buf, ' ');
-                  }
-                else
-                  g_string_append_c (buf, *p);
-              }
-          }
+        case PDB_DB_STACK_NODE:
+          pdb_db_parse_node (db, &state, this_entry.d.node);
           break;
         }
     }
 
-  string->length = buf->len;
-  string->text = g_string_free (buf, FALSE);
-  string->spans = spans.head;
+  string->length = state.buf->len;
+  string->text = g_string_free (state.buf, FALSE);
+  string->spans = state.spans.head;
 
-  g_array_free (stack, TRUE);
+  g_array_free (state.stack, TRUE);
 
   return TRUE;
 }
