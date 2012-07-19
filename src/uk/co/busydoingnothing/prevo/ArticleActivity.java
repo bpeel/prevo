@@ -23,17 +23,21 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.SpannableString;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.text.style.SuperscriptSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Vector;
 
 public class ArticleActivity extends Activity
 {
@@ -44,7 +48,12 @@ public class ArticleActivity extends Activity
 
   public static final String TAG = "prevoarticle";
 
+  private Vector<TextView> sectionHeaders;
+
   private Charset utf8Charset = Charset.forName ("UTF-8");
+
+  private ScrollView scrollView;
+  private int articleNumber;
 
   private static void throwEOF ()
     throws IOException
@@ -138,7 +147,7 @@ public class ArticleActivity extends Activity
       {
         int spanStart = readShort (in);
         int data1 = readShort (in);
-        int data2 = readShort (in);
+        final int data2 = readShort (in);
         int spanType = in.read ();
 
         if (spanType == -1)
@@ -146,6 +155,30 @@ public class ArticleActivity extends Activity
 
         switch (spanType)
           {
+          case 0:
+            {
+              ClickableSpan span;
+
+              if (data1 == this.articleNumber)
+                {
+                  span = (new ClickableSpan ()
+                    {
+                      @Override
+                      public void onClick (View widget)
+                      {
+                        showSection (data2);
+                      }
+                    });
+                }
+              else
+                {
+                  span = new ReferenceSpan (data1, data2);
+                }
+
+              string.setSpan (span, spanStart, spanStart + spanLength, 0);
+            }
+            break;
+
           case 1:
             string.setSpan (new SuperscriptSpan (),
                             spanStart,
@@ -206,6 +239,7 @@ public class ArticleActivity extends Activity
                                                     layout,
                                                     false);
             isTitle = false;
+            sectionHeaders.add (tv);
           }
         else
           {
@@ -213,6 +247,7 @@ public class ArticleActivity extends Activity
             isTitle = true;
           }
 
+        tv.setMovementMethod (LinkMovementMethod.getInstance ());
         tv.setText (str, TextView.BufferType.SPANNABLE);
 
         layout.addView (tv);
@@ -221,15 +256,29 @@ public class ArticleActivity extends Activity
     return layout;
   }
 
+  private void showSection (int section)
+  {
+    int ypos = 0;
+
+    Log.i (TAG, "Showing section " + section + " of article " + articleNumber);
+
+    /* If we're showing the first section then just scroll to the very top */
+    if (section > 0 && section < sectionHeaders.size ())
+      ypos = sectionHeaders.get (section).getTop ();
+
+    scrollView.scrollTo (0, ypos);
+  }
+
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
 
     Intent intent = getIntent ();
-    ScrollView scrollView = new ScrollView (this);
+    scrollView = new ScrollView (this);
 
     setContentView (scrollView);
+    sectionHeaders = new Vector<TextView> ();
 
     if (intent != null)
       {
@@ -240,6 +289,7 @@ public class ArticleActivity extends Activity
           {
             try
               {
+                this.articleNumber = article;
                 scrollView.addView (loadArticle (article, mark));
               }
             catch (IOException e)
