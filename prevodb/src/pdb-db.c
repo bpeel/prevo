@@ -132,6 +132,28 @@ struct _PdbDb
   GList *references;
 };
 
+typedef struct
+{
+  const char *name;
+  const char *symbol;
+} PdbDbRefType;
+
+static const PdbDbRefType
+pdb_db_ref_types[] =
+  {
+    { "vid", "→" },
+    { "hom", "→" },
+    { "dif", "=" },
+    { "sin", "⇒" },
+    { "ant", "⇝" },
+    { "super", "↗" },
+    { "sub", "↘" },
+    { "prt", "↘" },
+    { "malprt", "↗" },
+    { "lst", NULL /* ? */ },
+    { "ekz", "●" }
+  };
+
 static void
 pdb_db_add_index_entry (PdbDb *db,
                         const char *lang,
@@ -452,6 +474,27 @@ pdb_db_get_utf16_length (const char *buf)
   return length;
 }
 
+static PdbDbSpan *
+pdb_db_start_span (PdbDbParseState *state,
+                   PdbDbSpanType type)
+{
+  PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
+  PdbDbParseStackEntry *entry;
+
+  span->span_start =
+    pdb_db_get_utf16_length (state->buf->str);
+  span->type = type;
+
+  g_queue_push_tail (&state->spans, span);
+  /* Push the span onto the state.stack so that we can
+   * fill in the span length once all of the child
+   * nodes have been processed */
+  entry = pdb_db_parse_push_entry (state, PDB_DB_STACK_CLOSE_SPAN);
+  entry->d.span = span;
+
+  return span;
+}
+
 static gboolean
 pdb_db_handle_aut (PdbDb *db,
                    PdbDbParseState *state,
@@ -489,6 +532,50 @@ pdb_db_handle_rim (PdbDb *db,
   return TRUE;
 }
 
+static void
+pdb_db_handle_reference_type (PdbDbParseState *state,
+                              PdbDocElementNode *element)
+{
+  const char *parent_name;
+  char **att;
+
+  parent_name = ((PdbDocElementNode *) element->node.parent)->name;
+
+  /* Ignore the icon for the reference if the parent is one of the
+   * following types. A comment in the code for the WebOS version of
+   * PReVo says that the XSLT for ReVo does this too, but I can't seem
+   * to find it anymore */
+  if (!strcmp (parent_name, "dif") ||
+      !strcmp (parent_name, "rim") ||
+      !strcmp (parent_name, "ekz") ||
+      !strcmp (parent_name, "klr"))
+    return;
+
+  for (att = element->atts; att[0]; att += 2)
+    if (!strcmp (att[0], "tip"))
+      {
+        int i;
+
+        for (i = 0; i < G_N_ELEMENTS (pdb_db_ref_types); i++)
+          {
+            const PdbDbRefType *type = pdb_db_ref_types + i;
+
+            if (!strcmp (att[1], type->name))
+              {
+                if (type->symbol)
+                  {
+                    pdb_db_start_text (state);
+                    g_string_append (state->buf, type->symbol);
+                  }
+
+                break;
+              }
+          }
+
+        break;
+      }
+}
+
 static gboolean
 pdb_db_handle_ref (PdbDb *db,
                    PdbDbParseState *state,
@@ -510,10 +597,27 @@ pdb_db_handle_ref (PdbDb *db,
   return FALSE;
 
  found_cel:
+
+  pdb_db_handle_reference_type (state, element);
+
+  span = pdb_db_start_span (state, PDB_DB_SPAN_REFERENCE);
+
   reference = g_slice_new (PdbDbReference);
   reference->span = span;
   reference->name = g_strdup (att[1]);
   db->references = g_list_prepend (db->references, reference);
+
+  return TRUE;
+}
+
+static gboolean
+pdb_db_handle_refgrp (PdbDb *db,
+                      PdbDbParseState *state,
+                      PdbDocElementNode *element,
+                      PdbDbSpan *span,
+                      GError **error)
+{
+  pdb_db_handle_reference_type (state, element);
 
   return TRUE;
 }
@@ -566,8 +670,13 @@ pdb_db_element_spans[] =
     },
     {
       .name = "ref",
-      .type = PDB_DB_SPAN_REFERENCE,
+      .type = PDB_DB_SPAN_NONE,
       .handler = pdb_db_handle_ref
+    },
+    {
+      .name = "refgrp",
+      .type = PDB_DB_SPAN_NONE,
+      .handler = pdb_db_handle_refgrp
     },
     {
       .name = "rim",
@@ -578,27 +687,6 @@ pdb_db_element_spans[] =
     { .name = "em", .type = PDB_DB_SPAN_BOLD, },
     { .name = "aut", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_aut },
   };
-
-static PdbDbSpan *
-pdb_db_start_span (PdbDbParseState *state,
-                   PdbDbSpanType type)
-{
-  PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
-  PdbDbParseStackEntry *entry;
-
-  span->span_start =
-    pdb_db_get_utf16_length (state->buf->str);
-  span->type = type;
-
-  g_queue_push_tail (&state->spans, span);
-  /* Push the span onto the state.stack so that we can
-   * fill in the span length once all of the child
-   * nodes have been processed */
-  entry = pdb_db_parse_push_entry (state, PDB_DB_STACK_CLOSE_SPAN);
-  entry->d.span = span;
-
-  return span;
-}
 
 static gboolean
 pdb_db_parse_node (PdbDb *db,
