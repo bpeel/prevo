@@ -616,7 +616,10 @@ pdb_db_parse_node (PdbDb *db,
         PdbDocElementNode *element = (PdbDocElementNode *) node;
 
         if (!strcmp (element->name, "tld"))
-          pdb_db_append_tld (db, state->buf, element->atts);
+          {
+            pdb_db_start_text (state);
+            pdb_db_append_tld (db, state->buf, element->atts);
+          }
         /* Skip citations, adm tags and pictures */
         else if (!strcmp (element->name, "fnt") ||
                  !strcmp (element->name, "adm") ||
