@@ -31,12 +31,20 @@ prevodb_LDADD = \
 	@GLIB_LIBS@ \
 	$(NULL)
 
-noinst_PROGRAMS = dump-index test-doc
+noinst_PROGRAMS = dump-index dump-article test-doc
 
 dump_index_SOURCES = \
 	dump-index.c
 
 dump_index_LDADD = \
+	@GLIB_LIBS@ \
+	$(NULL)
+
+dump_article_SOURCES = \
+	dump-article.c \
+	$(NULL)
+
+dump_article_LDADD = \
 	@GLIB_LIBS@ \
 	$(NULL)
 

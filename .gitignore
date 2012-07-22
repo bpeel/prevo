@@ -19,6 +19,7 @@
 /prevodb/src/Makefile
 /prevodb/src/Makefile.in
 /prevodb/src/prevodb
+/prevodb/src/dump-article
 /prevodb/src/dump-index
 /prevodb/src/test-doc
 /prevodb/stamp-h1
