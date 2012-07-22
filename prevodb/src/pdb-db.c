@@ -1282,12 +1282,17 @@ pdb_db_write_string (PdbDb *pdb,
   for (l = string->spans; l; l = l->next)
     {
       PdbDbSpan *span = l->data;
-      guint16 v[4] = { GUINT16_TO_LE (span->span_length),
-                       GUINT16_TO_LE (span->span_start),
-                       GUINT16_TO_LE (span->data1),
-                       GUINT16_TO_LE (span->data2) };
-      fwrite (v, sizeof (len), 4, out);
-      fputc (span->type, out);
+
+      /* Ignore empty spans */
+      if (span->span_length > 0)
+        {
+          guint16 v[4] = { GUINT16_TO_LE (span->span_length),
+                           GUINT16_TO_LE (span->span_start),
+                           GUINT16_TO_LE (span->data1),
+                           GUINT16_TO_LE (span->data2) };
+          fwrite (v, sizeof (len), 4, out);
+          fputc (span->type, out);
+        }
     }
 
   len = GUINT16_TO_LE (0);
