@@ -137,7 +137,7 @@ pdb_lang_init_hash_table (PdbLang *lang)
     {
       PdbLangEntry *entry = &g_array_index (lang->languages, PdbLangEntry, i);
 
-      g_hash_table_insert (lang->hash_table, entry->code, entry->trie);
+      g_hash_table_insert (lang->hash_table, entry->code, entry);
     }
 }
 
@@ -173,12 +173,12 @@ pdb_lang_new (PdbRevo *revo,
                      "revo/cfg/lingvoj.xml",
                      error))
     {
-      pdb_lang_init_hash_table (lang);
-
       qsort (lang->languages->data,
              lang->languages->len,
              sizeof (PdbLangEntry),
              pdb_lang_compare_name);
+
+      pdb_lang_init_hash_table (lang);
     }
   else
     {
@@ -194,7 +194,22 @@ PdbTrie *
 pdb_lang_get_trie (PdbLang *lang,
                    const char *lang_code)
 {
-  return g_hash_table_lookup (lang->hash_table, lang_code);
+  PdbLangEntry *entry;
+
+  entry = g_hash_table_lookup (lang->hash_table, lang_code);
+
+  return entry ? entry->trie : NULL;
+}
+
+const char *
+pdb_lang_get_name (PdbLang *lang,
+                   const char *lang_code)
+{
+  PdbLangEntry *entry;
+
+  entry = g_hash_table_lookup (lang->hash_table, lang_code);
+
+  return entry ? entry->name : NULL;
 }
 
 void

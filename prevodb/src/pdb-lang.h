@@ -36,6 +36,10 @@ PdbTrie *
 pdb_lang_get_trie (PdbLang *lang,
                    const char *lang_code);
 
+const char *
+pdb_lang_get_name (PdbLang *lang,
+                   const char *lang_code);
+
 void
 pdb_lang_free (PdbLang *lang);
 
