@@ -69,6 +69,10 @@ pdb_doc_get_root (PdbDoc *doc);
 char *
 pdb_doc_get_element_text (PdbDocElementNode *node);
 
+void
+pdb_doc_append_element_text (PdbDocElementNode *node,
+                             GString *buf);
+
 PdbDocElementNode *
 pdb_doc_get_child_element (PdbDocNode *node,
                            const char *tag_name);

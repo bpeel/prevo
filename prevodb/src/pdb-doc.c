@@ -283,8 +283,9 @@ pdb_doc_get_root (PdbDoc *doc)
   return doc->root_node;
 }
 
-char *
-pdb_doc_get_element_text (PdbDocElementNode *element)
+void
+pdb_doc_append_element_text (PdbDocElementNode *element,
+                             GString *buf)
 {
   if (element->node.first_child)
     {
@@ -310,9 +311,17 @@ pdb_doc_get_element_text (PdbDocElementNode *element)
               g_string_append_len (buf, text_node->data, text_node->len);
             }
         }
-    }
 
-  g_ptr_array_free (stack, TRUE);
+      g_ptr_array_free (stack, TRUE);
+    }
+}
+
+char *
+pdb_doc_get_element_text (PdbDocElementNode *node)
+{
+  GString *buf = g_string_new (NULL);
+
+  pdb_doc_append_element_text (node, buf);
 
   return g_string_free (buf, FALSE);
 }
