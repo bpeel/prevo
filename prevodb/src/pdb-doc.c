@@ -286,27 +286,29 @@ pdb_doc_get_root (PdbDoc *doc)
 char *
 pdb_doc_get_element_text (PdbDocElementNode *element)
 {
-  GString *buf = g_string_new (NULL);
-  GPtrArray *stack = g_ptr_array_new ();
-
-  g_ptr_array_add (stack, element->node.first_child);
-
-  while (stack->len > 0)
+  if (element->node.first_child)
     {
-      PdbDocNode *node = g_ptr_array_index (stack, stack->len - 1);
-      g_ptr_array_set_size (stack, stack->len - 1);
+      GPtrArray *stack = g_ptr_array_new ();
 
-      if (node->next)
-        g_ptr_array_add (stack, node->next);
+      g_ptr_array_add (stack, element->node.first_child);
 
-      if (node->first_child)
-        g_ptr_array_add (stack, node->first_child);
-
-      if (node->type == PDB_DOC_NODE_TYPE_TEXT)
+      while (stack->len > 0)
         {
-          PdbDocTextNode *text_node = (PdbDocTextNode *) node;
+          PdbDocNode *node = g_ptr_array_index (stack, stack->len - 1);
+          g_ptr_array_set_size (stack, stack->len - 1);
 
-          g_string_append_len (buf, text_node->data, text_node->len);
+          if (node->next)
+            g_ptr_array_add (stack, node->next);
+
+          if (node->first_child)
+            g_ptr_array_add (stack, node->first_child);
+
+          if (node->type == PDB_DOC_NODE_TYPE_TEXT)
+            {
+              PdbDocTextNode *text_node = (PdbDocTextNode *) node;
+
+              g_string_append_len (buf, text_node->data, text_node->len);
+            }
         }
     }
 
