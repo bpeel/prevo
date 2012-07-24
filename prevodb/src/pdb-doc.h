@@ -77,4 +77,8 @@ PdbDocElementNode *
 pdb_doc_get_child_element (PdbDocNode *node,
                            const char *tag_name);
 
+const char *
+pdb_doc_get_attribute (PdbDocElementNode *element,
+                       const char *attr_name);
+
 #endif /* PDB_DOC_H */

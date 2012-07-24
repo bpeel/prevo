@@ -339,3 +339,16 @@ pdb_doc_get_child_element (PdbDocNode *node,
 
   return NULL;
 }
+
+const char *
+pdb_doc_get_attribute (PdbDocElementNode *element,
+                       const char *attr_name)
+{
+  char **att;
+
+  for (att = element->atts; att[0]; att += 2)
+    if (!strcmp (att[0], attr_name))
+      return att[1];
+
+  return NULL;
+}
