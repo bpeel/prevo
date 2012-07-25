@@ -154,6 +154,16 @@ public class ArticleActivity extends Activity
         if (spanType == -1)
           throwEOF ();
 
+        if (spanStart < 0 || spanLength < 0 ||
+            spanStart + spanLength > string.length ())
+          Log.wtf (TAG,
+                   "Invalid span " +
+                   spanStart +
+                   "→" +
+                   (spanLength + spanStart) +
+                   " for string of length " +
+                   string.length ());
+
         switch (spanType)
           {
           case 0:
