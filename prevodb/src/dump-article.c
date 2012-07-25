@@ -20,6 +20,30 @@
 #include <stdio.h>
 #include <glib.h>
 
+static int
+get_utf16_length (const char *buf,
+                  int buf_length)
+{
+  const char *end = buf + buf_length;
+  int length = 0;
+
+  /* Calculates the length that the string would have if it was
+   * encoded in UTF-16 */
+  for (; buf < end; buf = g_utf8_next_char (buf))
+    {
+      gunichar ch = g_utf8_get_char (buf);
+
+      length++;
+      /* If the character is outside the BMP then it
+       * will need an extra 16 bit number to encode
+       * it */
+      if (ch >= 0x10000)
+        length++;
+    }
+
+  return length;
+}
+
 static gboolean
 dump_article (const guint8 *article_data,
               int article_length)
@@ -27,6 +51,7 @@ dump_article (const guint8 *article_data,
   while (article_length > 0)
     {
       int text_length;
+      int utf16_length;
 
       if (article_length < 2)
         {
@@ -44,11 +69,24 @@ dump_article (const guint8 *article_data,
           return FALSE;
         }
 
+      utf16_length = get_utf16_length ((const char *) (article_data + 2),
+                                       text_length);
+
+      if (!g_utf8_validate ((const char *) (article_data + 2),
+                            text_length, NULL))
+        {
+          fprintf (stderr,
+                   "invalid UTF-8 string encountered");
+          return FALSE;
+        }
+
       fwrite (article_data + 2, 1, text_length, stdout);
       fputc ('\n', stdout);
 
       article_data += 2 + text_length;
       article_length -= 2 + text_length;
+
+      printf ("utf16_length = %i\n", utf16_length);
 
       while (TRUE)
         {
@@ -85,6 +123,14 @@ dump_article (const guint8 *article_data,
                   data1,
                   data2,
                   type);
+
+          if (span_start < 0 ||
+              span_length <= 0 ||
+              span_start + span_length > utf16_length)
+            {
+              fprintf (stderr, "invalid span");
+              return FALSE;
+            }
 
           article_data += 7;
           article_length -= 7;
