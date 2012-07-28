@@ -26,13 +26,20 @@ import android.widget.ListView;
 
 public class LanguagesActivity extends ListActivity
 {
+  private LanguageDatabaseHelper dbHelper;
+  private LanguagesAdapter adapter;
+
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
     setTitle (R.string.select_language);
     setContentView (R.layout.languages);
-    setListAdapter (new LanguagesAdapter (this));
+
+    adapter = new LanguagesAdapter (this);
+    setListAdapter (adapter);
+
+    dbHelper = new LanguageDatabaseHelper (this);
 
     ListView lv = getListView ();
 
@@ -56,9 +63,19 @@ public class LanguagesActivity extends ListActivity
                                           SearchActivity.class);
               intent.putExtra (SearchActivity.EXTRA_LANGUAGE,
                                lang.getCode ());
+
+              dbHelper.useLanguage (lang.getCode ());
+
               startActivity (intent);
             }
         }
       });
+  }
+
+  @Override public void onStart ()
+  {
+    super.onStart ();
+
+    adapter.setMainLanguages (dbHelper.getLanguages ());
   }
 }

@@ -32,11 +32,9 @@ import org.xmlpull.v1.XmlPullParserException;
 public class LanguagesAdapter extends BaseAdapter
   implements Filterable
 {
-  private static final Language[] mainLanguages =
+  private Language[] mainLanguages =
   {
-    new Language ("esperanto", "eo"),
-    new Language ("franca", "fr"),
-    new Language ("angla", "en")
+    new Language ("esperanto", "eo")
   };
 
   private Language[] allLanguages;
@@ -238,6 +236,33 @@ public class LanguagesAdapter extends BaseAdapter
       filter = new LanguagesFilter ();
 
     return filter;
+  }
+
+  private String getLanguageName (String languageCode)
+  {
+    for (int i = 0; i < allLanguages.length; i++)
+      if (languageCode.equals (allLanguages[i].getCode ()))
+        return allLanguages[i].getName ();
+
+    return languageCode;
+  }
+
+  public void setMainLanguages (String[] languages)
+  {
+    Language[] mainLanguages = new Language[languages.length + 1];
+
+    /* Preserve the 'esperanto' language */
+    mainLanguages[0] = this.mainLanguages[0];
+
+    for (int i = 0; i < languages.length; i++)
+      {
+        String languageName = getLanguageName (languages[i]);
+        mainLanguages[i + 1] = new Language (languageName, languages[i]);
+      }
+
+    this.mainLanguages = mainLanguages;
+
+    notifyDataSetChanged ();
   }
 
   private class LanguagesFilter extends Filter
