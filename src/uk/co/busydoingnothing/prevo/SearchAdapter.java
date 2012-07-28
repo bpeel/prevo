@@ -138,7 +138,7 @@ public class SearchAdapter extends BaseAdapter
     public FilterResults performFiltering (CharSequence filter)
     {
       FilterResults ret = new FilterResults ();
-      String filterString = Hats.removeHats (filter);
+      String filterString = Hats.removeHats (filter).toLowerCase ();
       SearchResult[] results = new SearchResult[MAX_RESULTS];
 
       ret.values = results;
