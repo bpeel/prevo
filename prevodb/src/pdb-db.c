@@ -112,6 +112,28 @@ typedef struct
   PdbDbSection *section;
 } PdbDbMark;
 
+typedef enum
+{
+  PDB_DB_INDEX_ENTRY_TYPE_MARK,
+  PDB_DB_INDEX_ENTRY_TYPE_DIRECT
+} PdbDbIndexEntryType;
+
+typedef struct
+{
+  PdbDbIndexEntryType type;
+
+  union
+  {
+    struct
+    {
+      PdbDbArticle *article;
+      PdbDbSection *section;
+    } direct;
+
+    char *mark;
+  } d;
+} PdbDbIndexEntry;
+
 struct _PdbDb
 {
   PdbLang *lang;
@@ -156,62 +178,6 @@ pdb_db_ref_types[] =
   };
 
 static void
-pdb_db_add_index_entry (PdbDb *db,
-                        const char *lang,
-                        const char *name,
-                        PdbDbArticle *article,
-                        PdbDbSection *section)
-{
-  PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
-
-  if (trie)
-    {
-      PdbDbMark *mark = g_slice_new (PdbDbMark);
-      const char *p;
-
-      /* Check if any of the characters in the name are upper case */
-      for (p = name; *p; p = g_utf8_next_char (p))
-        {
-          gunichar ch = g_utf8_get_char (p);
-
-          if (g_unichar_isupper (ch))
-            break;
-        }
-
-      mark->article = article;
-      mark->section = section;
-
-      /* If we found an uppercase character then we'll additionally
-       * add a lower case representation of the name so that the
-       * search can be case insensitive */
-      if (*p)
-        {
-          GString *buf = g_string_new (NULL);
-
-          for (p = name; *p; p = g_utf8_next_char (p))
-            {
-              gunichar ch = g_unichar_tolower (g_utf8_get_char (p));
-              g_string_append_unichar (buf, ch);
-            }
-
-          pdb_trie_add_word (trie,
-                             buf->str,
-                             name,
-                             mark);
-
-          g_string_free (buf, TRUE);
-        }
-      else
-        {
-          pdb_trie_add_word (trie,
-                             name,
-                             NULL,
-                             mark);
-        }
-    }
-}
-
-static void
 pdb_db_trim_buf (GString *buf)
 {
   char *dst;
@@ -235,6 +201,94 @@ pdb_db_trim_buf (GString *buf)
     dst--;
 
   g_string_set_size (buf, dst - buf->str);
+}
+
+static void
+pdb_db_index_entry_free (PdbDbIndexEntry *entry)
+{
+  switch (entry->type)
+    {
+    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+      g_free (entry->d.mark);
+      break;
+
+    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+      break;
+    }
+
+  g_slice_free (PdbDbIndexEntry, entry);
+}
+
+static PdbDbIndexEntry *
+pdb_db_index_entry_copy (const PdbDbIndexEntry *entry_in)
+{
+  PdbDbIndexEntry *entry_out = g_slice_dup (PdbDbIndexEntry, entry_in);
+
+  switch (entry_in->type)
+    {
+    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+      entry_out->d.mark = g_strdup (entry_out->d.mark);
+      break;
+
+    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+      break;
+    }
+
+  return entry_out;
+}
+
+static void
+pdb_db_add_index_entry (PdbDb *db,
+                        const char *lang,
+                        const char *name,
+                        const char *display_name,
+                        const PdbDbIndexEntry *entry_in)
+{
+  PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
+
+  if (trie)
+    {
+      PdbDbIndexEntry *entry =
+        pdb_db_index_entry_copy (entry_in);
+      const char *p;
+
+      /* Check if any of the characters in the name are upper case */
+      for (p = name; *p; p = g_utf8_next_char (p))
+        {
+          gunichar ch = g_utf8_get_char (p);
+
+          if (g_unichar_isupper (ch))
+            break;
+        }
+
+      /* If we found an uppercase character then we'll additionally
+       * add a lower case representation of the name so that the
+       * search can be case insensitive */
+      if (*p || display_name)
+        {
+          GString *buf = g_string_new (NULL);
+
+          for (p = name; *p; p = g_utf8_next_char (p))
+            {
+              gunichar ch = g_unichar_tolower (g_utf8_get_char (p));
+              g_string_append_unichar (buf, ch);
+            }
+
+          pdb_trie_add_word (trie,
+                             buf->str,
+                             display_name ? display_name : name,
+                             entry);
+
+          g_string_free (buf, TRUE);
+        }
+      else
+        {
+          pdb_trie_add_word (trie,
+                             name,
+                             NULL,
+                             entry);
+        }
+    }
 }
 
 static void
@@ -603,6 +657,105 @@ pdb_db_handle_translation (PdbDb *db,
 }
 
 static gboolean
+pdb_db_add_trd_index (PdbDb *db,
+                      PdbDocElementNode *element,
+                      const char *lang_code,
+                      GError **error)
+{
+  PdbDocElementNode *ind;
+  PdbDbIndexEntry entry;
+  const char *mark;
+
+  mark = pdb_db_get_innermost_mark (&element->node);
+
+  if (mark == NULL)
+    {
+      fprintf (stderr,
+               "%s element found with no containing mrk attribute",
+               element->name);
+      return TRUE;
+    }
+
+  entry.type = PDB_DB_INDEX_ENTRY_TYPE_MARK;
+  entry.d.mark = (char *) mark;
+
+  if ((ind = pdb_doc_get_child_element (&element->node, "ind")))
+    {
+      GString *real_name = g_string_new (NULL);
+      GString *display_name = g_string_new (NULL);
+
+      pdb_doc_append_element_text (ind, real_name);
+      pdb_db_trim_buf (real_name);
+
+      pdb_doc_append_element_text (element, display_name);
+      pdb_db_trim_buf (display_name);
+
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              real_name->str,
+                              display_name->str,
+                              &entry);
+
+      g_string_free (real_name, TRUE);
+      g_string_free (display_name, TRUE);
+    }
+  else
+    {
+      GString *name = g_string_new (NULL);
+
+      pdb_doc_append_element_text (element, name);
+      pdb_db_trim_buf (name);
+
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              name->str,
+                              NULL,
+                              &entry);
+
+      g_string_free (name, TRUE);
+    }
+
+  return TRUE;
+}
+
+static gboolean
+pdb_db_add_translation_index (PdbDb *db,
+                              PdbDocElementNode *element,
+                              GError **error)
+{
+  const char *lang_code;
+
+  lang_code = pdb_doc_get_attribute (element, "lng");
+
+  if (lang_code == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "%s element with no lng attribute",
+                   element->name);
+      return FALSE;
+    }
+
+  if (!strcmp (element->name, "trdgrp"))
+    {
+      PdbDocNode *node;
+
+      for (node = element->node.first_child; node; node = node->next)
+        if (node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+            !pdb_db_add_trd_index (db,
+                                   (PdbDocElementNode *) node,
+                                   lang_code,
+                                   error))
+          return FALSE;
+
+      return TRUE;
+    }
+  else
+    return pdb_db_add_trd_index (db, element, lang_code, error);
+}
+
+static gboolean
 pdb_db_find_translations (PdbDb *db,
                           PdbDocElementNode *root_node,
                           GList **results,
@@ -640,6 +793,14 @@ pdb_db_find_translations (PdbDb *db,
                                               element,
                                               translations,
                                               error))
+                {
+                  ret = FALSE;
+                  break;
+                }
+
+              if (!pdb_db_add_translation_index (db,
+                                                 element,
+                                                 error))
                 {
                   ret = FALSE;
                   break;
@@ -1230,6 +1391,7 @@ pdb_db_add_kap_index (PdbDb *db,
 {
   GString *buf = g_string_new (NULL);
   PdbDocNode *node;
+  PdbDbIndexEntry entry;
 
   for (node = kap->node.first_child; node; node = node->next)
     switch (node->type)
@@ -1251,8 +1413,16 @@ pdb_db_add_kap_index (PdbDb *db,
         break;
       }
 
+  entry.type = PDB_DB_INDEX_ENTRY_TYPE_DIRECT;
+  entry.d.direct.article = article;
+  entry.d.direct.section = section;
+
   pdb_db_trim_buf (buf);
-  pdb_db_add_index_entry (db, "eo", buf->str, article, section);
+  pdb_db_add_index_entry (db,
+                          "eo", /* language code */
+                          buf->str, /* name */
+                          NULL, /* display name */
+                          &entry);
 
   g_string_free (buf, TRUE);
 }
@@ -1522,7 +1692,7 @@ static void
 pdb_db_free_data_cb (void *data,
                      void *user_data)
 {
-  g_slice_free (PdbDbMark, data);
+  pdb_db_index_entry_free (data);
 }
 
 static void
@@ -1531,10 +1701,36 @@ pdb_db_get_reference_cb (void *data,
                          int *mark_num,
                          void *user_data)
 {
-  PdbDbMark *mark = data;
+  PdbDb *db = user_data;
+  PdbDbIndexEntry *entry = data;
 
-  *article_num = mark->article->article_num;
-  *mark_num = mark->section->section_num;
+  switch (entry->type)
+    {
+    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+      {
+        PdbDbMark *mark = g_hash_table_lookup (db->marks, entry->d.mark);
+
+        if (mark)
+          {
+            *article_num = mark->article->article_num;
+            *mark_num = mark->section->section_num;
+          }
+        else
+          {
+            *article_num = 0;
+            *mark_num = 0;
+            fprintf (stderr,
+                     "no mark found for reference \"%s\"\n",
+                     entry->d.mark);
+          }
+      }
+      break;
+
+    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+      *article_num = entry->d.direct.article->article_num;
+      *mark_num = entry->d.direct.section->section_num;
+      break;
+    }
 }
 
 PdbDb *
