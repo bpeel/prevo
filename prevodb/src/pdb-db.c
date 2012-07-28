@@ -1755,6 +1755,7 @@ pdb_db_new (PdbRevo *revo,
     }
 
   db->articles = g_ptr_array_new ();
+  db->references = NULL;
 
   db->marks = g_hash_table_new_full (g_str_hash,
                                      g_str_equal,
