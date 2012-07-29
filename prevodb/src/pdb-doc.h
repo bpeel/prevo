@@ -82,6 +82,9 @@ PdbDocElementNode *
 pdb_doc_get_child_element (PdbDocNode *node,
                            const char *tag_name);
 
+gboolean
+pdb_doc_element_has_child_element (PdbDocElementNode *element);
+
 const char *
 pdb_doc_get_attribute (PdbDocElementNode *element,
                        const char *attr_name);

@@ -367,6 +367,18 @@ pdb_doc_get_child_element (PdbDocNode *node,
   return NULL;
 }
 
+gboolean
+pdb_doc_element_has_child_element (PdbDocElementNode *element)
+{
+  PdbDocNode *node;
+
+  for (node = element->node.first_child; node; node = node->next)
+    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
+      return TRUE;
+
+  return FALSE;
+}
+
 const char *
 pdb_doc_get_attribute (PdbDocElementNode *element,
                        const char *attr_name)
