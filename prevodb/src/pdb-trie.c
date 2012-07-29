@@ -115,13 +115,14 @@ pdb_trie_add_word (PdbTrie *trie,
                    const char *display_word,
                    void *data)
 {
+  const char *p = word;
   PdbTrieNode *node = trie->root;
   PdbTrieArticle *article;
 
-  while (*word)
+  while (*p)
     {
       GSList *l;
-      gunichar ch = g_utf8_get_char (word);
+      gunichar ch = g_utf8_get_char (p);
 
       /* Look for a child with this letter */
       for (l = node->children; l; l = l->next)
@@ -163,12 +164,12 @@ pdb_trie_add_word (PdbTrie *trie,
           node = child;
         }
 
-      word = g_utf8_next_char (word);
+      p = g_utf8_next_char (p);
     }
 
   article = g_slice_new (PdbTrieArticle);
   article->data = data;
-  if (display_word)
+  if (display_word && strcmp (display_word, word))
     article->display_word = g_strdup (display_word);
   else
     article->display_word = NULL;
