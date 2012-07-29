@@ -73,6 +73,11 @@ void
 pdb_doc_append_element_text (PdbDocElementNode *node,
                              GString *buf);
 
+void
+pdb_doc_append_element_text_with_ignore (PdbDocElementNode *element,
+                                         GString *buf,
+                                         ...) G_GNUC_NULL_TERMINATED;
+
 PdbDocElementNode *
 pdb_doc_get_child_element (PdbDocNode *node,
                            const char *tag_name);

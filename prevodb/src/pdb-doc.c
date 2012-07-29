@@ -284,8 +284,9 @@ pdb_doc_get_root (PdbDoc *doc)
 }
 
 void
-pdb_doc_append_element_text (PdbDocElementNode *element,
-                             GString *buf)
+pdb_doc_append_element_text_with_ignore (PdbDocElementNode *element,
+                                         GString *buf,
+                                         ...)
 {
   if (element->node.first_child)
     {
@@ -301,19 +302,45 @@ pdb_doc_append_element_text (PdbDocElementNode *element,
           if (node->next)
             g_ptr_array_add (stack, node->next);
 
-          if (node->first_child)
-            g_ptr_array_add (stack, node->first_child);
-
-          if (node->type == PDB_DOC_NODE_TYPE_TEXT)
+          switch (node->type)
             {
-              PdbDocTextNode *text_node = (PdbDocTextNode *) node;
+            case PDB_DOC_NODE_TYPE_TEXT:
+              {
+                PdbDocTextNode *text_node = (PdbDocTextNode *) node;
 
-              g_string_append_len (buf, text_node->data, text_node->len);
+                g_string_append_len (buf, text_node->data, text_node->len);
+              }
+              break;
+
+            case PDB_DOC_NODE_TYPE_ELEMENT:
+              {
+                PdbDocElementNode *element_node = (PdbDocElementNode *) node;
+                const char *skip_name;
+                va_list ap;
+
+                /* Skip any elements listed in the varargs */
+                va_start (ap, buf);
+                while ((skip_name = va_arg (ap, const char *)) &&
+                       strcmp (element_node->name, skip_name));
+                va_end (ap);
+
+                if (skip_name == NULL)
+                  if (node->first_child)
+                    g_ptr_array_add (stack, node->first_child);
+              }
+              break;
             }
         }
 
       g_ptr_array_free (stack, TRUE);
     }
+}
+
+void
+pdb_doc_append_element_text (PdbDocElementNode *element,
+                             GString *buf)
+{
+  pdb_doc_append_element_text_with_ignore (element, buf, NULL);
 }
 
 char *
