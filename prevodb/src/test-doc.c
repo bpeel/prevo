@@ -129,7 +129,7 @@ main (int argc, char **argv)
         }
       else
         {
-          char **files = pdb_revo_list_files (revo, "revo/xml/*.xml", &error);
+          char **files = pdb_revo_list_files (revo, "xml/*.xml", &error);
 
           if (files == NULL)
             {

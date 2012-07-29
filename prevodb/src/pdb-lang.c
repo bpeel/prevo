@@ -170,7 +170,7 @@ pdb_lang_new (PdbRevo *revo,
   pdb_xml_set_character_data_handler (lang->parser, pdb_lang_character_data_cb);
 
   if (pdb_xml_parse (lang->parser,
-                     "revo/cfg/lingvoj.xml",
+                     "cfg/lingvoj.xml",
                      error))
     {
       qsort (lang->languages->data,

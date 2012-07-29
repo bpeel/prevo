@@ -20,7 +20,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "pdb-revo.h"
 #include "pdb-error.h"
@@ -28,6 +30,7 @@
 struct _PdbRevo
 {
   char *zip_file;
+  gboolean is_dir;
 };
 
 struct _PdbRevoFile
@@ -45,9 +48,22 @@ pdb_revo_new (const char *filename,
               GError **error)
 {
   PdbRevo *revo;
+  struct stat statbuf;
+
+  if (stat (filename, &statbuf) == -1)
+    {
+      g_set_error (error,
+                   G_FILE_ERROR,
+                   g_file_error_from_errno (errno),
+                   "%s: %s",
+                   filename,
+                   strerror (errno));
+      return NULL;
+    }
 
   revo = g_slice_new (PdbRevo);
   revo->zip_file = g_strdup (filename);
+  revo->is_dir = !!S_ISDIR (statbuf.st_mode);
 
   return revo;
 }
@@ -130,11 +146,11 @@ pdb_revo_check_error (PdbRevoFile *file,
   return TRUE;
 }
 
-gboolean
-pdb_revo_read (PdbRevoFile *file,
-               char *buf,
-               size_t *buflen,
-               GError **error)
+static gboolean
+pdb_revo_read_process (PdbRevoFile *file,
+                       char *buf,
+                       size_t *buflen,
+                       GError **error)
 {
   size_t total_got = 0;
 
@@ -234,19 +250,73 @@ pdb_revo_read (PdbRevoFile *file,
   return TRUE;
 }
 
+static gboolean
+pdb_revo_read_file (PdbRevoFile *file,
+                    char *buf,
+                    size_t *buflen,
+                    GError **error)
+{
+  size_t total_got = 0;
+
+  while (*buflen > 0 && !file->in_end)
+    {
+      ssize_t got = read (file->child_out, buf, *buflen);
+
+      if (got == -1)
+        {
+          g_set_error (error,
+                       G_FILE_ERROR,
+                       g_file_error_from_errno (errno),
+                       "%s",
+                       strerror (errno));
+          return FALSE;
+        }
+      else if (got == 0)
+        file->in_end = TRUE;
+      else
+        {
+          total_got += got;
+          *buflen -= got;
+          buf += got;
+        }
+    }
+
+  *buflen = total_got;
+
+  return TRUE;
+}
+
+gboolean
+pdb_revo_read (PdbRevoFile *file,
+               char *buf,
+               size_t *buflen,
+               GError **error)
+{
+  if (file->child_pid == 0)
+    return pdb_revo_read_file (file, buf, buflen, error);
+  else
+    return pdb_revo_read_process (file, buf, buflen, error);
+}
+
 void
 pdb_revo_close (PdbRevoFile *file)
 {
   int child_status;
 
   close (file->child_out);
-  close (file->child_err);
 
-  if (!file->child_reaped)
-    while (waitpid (file->child_pid, &child_status, 0 /* options */) == -1 &&
-           errno == EINTR);
+  if (file->child_pid != 0)
+    {
+      close (file->child_err);
 
-  g_string_free (file->error_buf, TRUE);
+      if (!file->child_reaped)
+        while (waitpid (file->child_pid,
+                        &child_status,
+                        0 /* options */) == -1 &&
+               errno == EINTR);
+
+      g_string_free (file->error_buf, TRUE);
+    }
 
   g_slice_free (PdbRevoFile, file);
 }
@@ -289,6 +359,12 @@ pdb_revo_list_files_process_line (PdbRevoListFilesData *data,
       /* Skip spaces to the filename */
       while (g_ascii_isspace (*line))
         line++;
+
+      /* Ignore any files that aren't in revo/ */
+      if (g_str_has_prefix (line, "revo/"))
+        line += 5;
+      else
+        return TRUE;
 
       if (*line == '\0')
         goto error;
@@ -351,19 +427,21 @@ pdb_revo_list_files_handle_data (PdbRevoListFilesData *data,
   return TRUE;
 }
 
-char **
-pdb_revo_list_files (PdbRevo *revo,
-                     const char *glob,
-                     GError **error)
+static char **
+pdb_revo_list_files_process (PdbRevo *revo,
+                             const char *glob,
+                             GError **error)
 {
   PdbRevoListFilesData data;
   PdbRevoFile *file;
-  gchar *argv[] = { "unzip", "-l", revo->zip_file, (char *) glob, NULL };
+  gchar *argv[] = { "unzip", "-l", revo->zip_file, NULL, NULL };
   gboolean res = TRUE;
 
   data.files = g_ptr_array_new ();
   data.line_buf = g_string_new (NULL);
   data.in_list = FALSE;
+
+  argv[3] = g_build_filename ("revo", glob, NULL);
 
   if ((file = pdb_revo_open_command (revo, argv, error)))
     {
@@ -386,6 +464,8 @@ pdb_revo_list_files (PdbRevo *revo,
       pdb_revo_close (file);
     }
 
+  g_free (argv[3]);
+
   g_string_free (data.line_buf, TRUE);
 
   if (res)
@@ -404,6 +484,75 @@ pdb_revo_list_files (PdbRevo *revo,
 
       return NULL;
     }
+}
+
+static char **
+pdb_revo_list_files_file (PdbRevo *revo,
+                          const char *glob,
+                          GError **error)
+{
+  GPatternSpec *pattern;
+  gboolean ret = TRUE;
+  GPtrArray *results;
+  char *bn, *dn, *full_dn;
+  GDir *dir;
+
+  bn = g_path_get_basename (glob);
+  pattern = g_pattern_spec_new (bn);
+  g_free (bn);
+
+  dn = g_path_get_dirname (glob);
+
+  full_dn = g_build_filename (revo->zip_file, dn, NULL);
+  dir = g_dir_open (full_dn, 0, error);
+  g_free (full_dn);
+
+  results = g_ptr_array_new ();
+
+  if (dir == NULL)
+    ret = FALSE;
+  else
+    {
+      const char *fn;
+
+      while ((fn = g_dir_read_name (dir)))
+        if (g_pattern_match_string (pattern, fn))
+          g_ptr_array_add (results, g_build_filename (dn, fn, NULL));
+
+      g_dir_close (dir);
+    }
+
+  g_free (dn);
+
+  g_pattern_spec_free (pattern);
+
+  if (ret)
+    {
+      g_ptr_array_add (results, NULL);
+      return (char **) g_ptr_array_free (results, FALSE);
+    }
+  else
+    {
+      int i;
+
+      for (i = 0; i < results->len; i++)
+        g_free (results->pdata[i]);
+
+      g_ptr_array_free (results, TRUE);
+
+      return NULL;
+    }
+}
+
+char **
+pdb_revo_list_files (PdbRevo *revo,
+                     const char *glob,
+                     GError **error)
+{
+  if (revo->is_dir)
+    return pdb_revo_list_files_file (revo, glob, error);
+  else
+    return pdb_revo_list_files_process (revo, glob, error);
 }
 
 static char *
@@ -439,21 +588,77 @@ pdb_revo_expand_filename (const char *filename)
   return ret;
 }
 
+static PdbRevoFile *
+pdb_revo_open_file (PdbRevo *revo,
+                    const char *filename,
+                    GError **error)
+{
+  char *full_filename;
+  int fd;
+
+  full_filename = g_build_filename (revo->zip_file, filename, NULL);
+
+  fd = open (full_filename, O_RDONLY, 0);
+
+  g_free (full_filename);
+
+  if (fd == -1)
+    {
+      g_set_error (error,
+                   G_FILE_ERROR,
+                   g_file_error_from_errno (errno),
+                   "%s: %s",
+                   filename,
+                   strerror (errno));
+      return NULL;
+    }
+  else
+    {
+      PdbRevoFile *revo_file = g_slice_new (PdbRevoFile);
+
+      revo_file->child_pid = 0;
+      revo_file->child_out = fd;
+      revo_file->child_err = -1;
+      revo_file->in_end = FALSE;
+      revo_file->err_end = FALSE;
+      revo_file->child_reaped = FALSE;
+      revo_file->error_buf = NULL;
+
+      return revo_file;
+    }
+}
+
+static PdbRevoFile *
+pdb_revo_open_process (PdbRevo *revo,
+                       const char *filename,
+                       GError **error)
+{
+  char *argv[] = { "unzip", "-p", revo->zip_file, NULL, NULL };
+  char *expanded_name;
+  char *full_name;
+  PdbRevoFile *file;
+
+  expanded_name = pdb_revo_expand_filename (filename);
+  full_name = g_build_filename ("revo", expanded_name, NULL);
+  argv[3] = full_name;
+  g_free (expanded_name);
+
+  file = pdb_revo_open_command (revo, argv, error);
+
+  g_free (full_name);
+
+  return file;
+}
+
 PdbRevoFile *
 pdb_revo_open (PdbRevo *revo,
                const char *filename,
                GError **error)
 {
-  char *argv[] = { "unzip", "-p", revo->zip_file, NULL, NULL };
-  PdbRevoFile *file;
-
-  argv[3] = pdb_revo_expand_filename (filename);
-
-  file = pdb_revo_open_command (revo, argv, error);
-
-  g_free (argv[3]);
-
-  return file;
+  if (revo->is_dir)
+    return pdb_revo_open_file (revo, filename, error);
+  else
+    return pdb_revo_open_process (revo, filename, error);
 }
 
 void
