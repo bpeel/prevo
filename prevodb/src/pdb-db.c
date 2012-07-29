@@ -664,6 +664,7 @@ pdb_db_add_trd_index (PdbDb *db,
 {
   PdbDocElementNode *ind;
   PdbDbIndexEntry entry;
+  GString *display_name;
   const char *mark;
 
   mark = pdb_db_get_innermost_mark (&element->node);
@@ -679,16 +680,20 @@ pdb_db_add_trd_index (PdbDb *db,
   entry.type = PDB_DB_INDEX_ENTRY_TYPE_MARK;
   entry.d.mark = (char *) mark;
 
+  display_name = g_string_new (NULL);
+
+  pdb_doc_append_element_text_with_ignore (element,
+                                           display_name,
+                                           "ofc",
+                                           NULL);
+  pdb_db_trim_buf (display_name);
+
   if ((ind = pdb_doc_get_child_element (&element->node, "ind")))
     {
       GString *real_name = g_string_new (NULL);
-      GString *display_name = g_string_new (NULL);
 
       pdb_doc_append_element_text (ind, real_name);
       pdb_db_trim_buf (real_name);
-
-      pdb_doc_append_element_text (element, display_name);
-      pdb_db_trim_buf (display_name);
 
       pdb_db_add_index_entry (db,
                               lang_code,
@@ -697,23 +702,37 @@ pdb_db_add_trd_index (PdbDb *db,
                               &entry);
 
       g_string_free (real_name, TRUE);
-      g_string_free (display_name, TRUE);
     }
-  else
+  else if (pdb_doc_element_has_child_element (element))
     {
-      GString *name = g_string_new (NULL);
+      GString *real_name = g_string_new (NULL);
 
-      pdb_doc_append_element_text (element, name);
-      pdb_db_trim_buf (name);
+      /* We don't want <klr> tags in the index name */
+      pdb_doc_append_element_text_with_ignore (element,
+                                               real_name,
+                                               "ofc",
+                                               "klr",
+                                               NULL);
+      pdb_db_trim_buf (real_name);
 
       pdb_db_add_index_entry (db,
                               lang_code,
-                              name->str,
-                              NULL,
+                              real_name->str,
+                              display_name->str,
                               &entry);
 
-      g_string_free (name, TRUE);
+      g_string_free (real_name, TRUE);
     }
+  else
+    {
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              display_name->str,
+                              NULL,
+                              &entry);
+    }
+
+  g_string_free (display_name, TRUE);
 
   return TRUE;
 }
