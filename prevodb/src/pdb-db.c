@@ -28,6 +28,7 @@
 #include "pdb-mkdir.h"
 #include "pdb-error.h"
 #include "pdb-strcmp.h"
+#include "pdb-roman.h"
 
 /* The article file format is a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
@@ -1644,24 +1645,125 @@ pdb_db_parse_subart (PdbDb *db,
                      GError **error)
 {
   PdbDocNode *node;
+  PdbDocElementNode *drv;
+  PdbDbSection *section;
+  GString *buf;
+  int subart_num;
 
-  for (node = root_node->node.first_child; node; node = node->next)
-    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
-      {
-        PdbDocElementNode *element = (PdbDocElementNode *) node;
+  subart_num = pdb_db_get_element_num (root_node);
 
-        if (!strcmp (element->name, "drv"))
-          {
-            PdbDbSection *section;
+  if (subart_num == -1)
+    /* It probably doesn't make any sense to have a <subart> on its
+     * own, but the article for '-il' seems to do it anyway */
+    subart_num = 0;
 
-            section = pdb_db_parse_drv (db, article, element, error);
+  section = g_slice_new (PdbDbSection);
 
-            if (section == NULL)
+  buf = g_string_new (NULL);
+  pdb_roman_to_text_append (subart_num + 1, buf);
+  g_string_append (buf, ".");
+  section->title.length = buf->len;
+  section->title.text = g_string_free (buf, FALSE);
+  section->title.spans = NULL;
+
+  /* Let's assume the sub-article will either be a collection of
+   * <drv>s or directly a spannable string, not a mix */
+  if ((drv = pdb_doc_get_child_element (&root_node->node, "drv")))
+    {
+      /* The first child can optionally be the definition */
+      for (node = root_node->node.first_child;
+           node && node->type == PDB_DOC_NODE_TYPE_TEXT;
+           node = node->next);
+
+      if (node &&
+          node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+          !strcmp (((PdbDocElementNode *) node)->name, "dif"))
+        {
+          if (!pdb_db_parse_spannable_string (db,
+                                              (PdbDocElementNode *) node,
+                                              &section->text,
+                                              error))
+            {
+              pdb_db_destroy_spannable_string (&section->title);
+              g_slice_free (PdbDbSection, section);
               return FALSE;
-            else
-              g_queue_push_tail (sections, section);
+            }
+          node = node->next;
+        }
+      else
+        {
+          section->text.length = 0;
+          section->text.text = g_strdup ("");
+          section->text.spans = NULL;
+        }
+
+      g_queue_push_tail (sections, section);
+
+      for (; node; node = node->next)
+        switch (node->type)
+          {
+          case PDB_DOC_NODE_TYPE_ELEMENT:
+            {
+              PdbDocElementNode *element = (PdbDocElementNode *) node;
+
+              if (!strcmp (element->name, "drv"))
+                {
+                  PdbDbSection *section;
+
+                  section = pdb_db_parse_drv (db, article, element, error);
+
+                  if (section == NULL)
+                    return FALSE;
+                  else
+                    g_queue_push_tail (sections, section);
+                }
+              else if (strcmp (element->name, "adm") &&
+                       strcmp (element->name, "trd") &&
+                       strcmp (element->name, "trdgrp") &&
+                       /* FIXME - this probably shouldn't strip out
+                        * <rim> tags here */
+                       strcmp (element->name, "rim"))
+                {
+                  g_set_error (error,
+                               PDB_ERROR,
+                               PDB_ERROR_BAD_FORMAT,
+                               "<%s> tag found in <subart> that has a <drv>",
+                               element->name);
+                  return FALSE;
+                }
+            }
+            break;
+
+          case PDB_DOC_NODE_TYPE_TEXT:
+            {
+              PdbDocTextNode *text = (PdbDocTextNode *) node;
+              int i;
+
+              for (i = 0; i < text->len; i++)
+                if (!g_ascii_isspace (text->data[i]))
+                  {
+                    g_set_error (error,
+                                 PDB_ERROR,
+                                 PDB_ERROR_BAD_FORMAT,
+                                 "Unexpected bare text in <subart> that "
+                                 "has a <drv>");
+                    return FALSE;
+                  }
+            }
+            break;
           }
-      }
+    }
+  else if (!pdb_db_parse_spannable_string (db,
+                                           root_node,
+                                           &section->text,
+                                           error))
+    {
+      pdb_db_destroy_spannable_string (&section->title);
+      g_slice_free (PdbDbSection, section);
+      return FALSE;
+    }
+  else
+    g_queue_push_tail (sections, section);
 
   return TRUE;
 }
