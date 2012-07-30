@@ -1210,6 +1210,27 @@ pdb_db_handle_refgrp (PdbDb *db,
 }
 
 static gboolean
+pdb_db_handle_subdrv (PdbDb *db,
+                      PdbDbParseState *state,
+                      PdbDocElementNode *element,
+                      PdbDbSpan *span,
+                      GError **error)
+{
+  int sence_num;
+
+  sence_num = pdb_db_get_element_num (element);
+
+  /* We don't need to do anything if this is the only subdrv */
+  if (sence_num != -1)
+    {
+      pdb_db_start_text (state);
+      g_string_append_printf (state->buf, "%c. ", sence_num + 'A');
+    }
+
+  return TRUE;
+}
+
+static gboolean
 pdb_db_handle_snc (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocElementNode *element,
@@ -1230,15 +1251,48 @@ pdb_db_handle_snc (PdbDb *db,
   return TRUE;
 }
 
+static gboolean
+pdb_db_handle_subsnc (PdbDb *db,
+                      PdbDbParseState *state,
+                      PdbDocElementNode *element,
+                      PdbDbSpan *span,
+                      GError **error)
+{
+  int sence_num;
+
+  sence_num = pdb_db_get_element_num (element);
+
+  /* We don't need to do anything if this is the only subsence */
+  if (sence_num != -1)
+    {
+      pdb_db_start_text (state);
+      g_string_append_printf (state->buf, "%c) ", sence_num + 'a');
+    }
+
+  return TRUE;
+}
+
 static PdbDbElementSpan
 pdb_db_element_spans[] =
   {
     { .name = "ofc", .type = PDB_DB_SPAN_SUPERSCRIPT },
     { .name = "ekz", .type = PDB_DB_SPAN_ITALIC },
     {
+      .name = "subdrv",
+      .type = PDB_DB_SPAN_NONE,
+      .handler = pdb_db_handle_subdrv,
+      .paragraph = TRUE
+    },
+    {
       .name = "snc",
       .type = PDB_DB_SPAN_NONE,
       .handler = pdb_db_handle_snc,
+      .paragraph = TRUE
+    },
+    {
+      .name = "subsnc",
+      .type = PDB_DB_SPAN_NONE,
+      .handler = pdb_db_handle_subsnc,
       .paragraph = TRUE
     },
     {
