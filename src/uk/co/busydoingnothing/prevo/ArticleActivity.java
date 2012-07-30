@@ -33,7 +33,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.InputStream;
 import java.io.IOException;
@@ -53,7 +52,7 @@ public class ArticleActivity extends Activity
 
   private Charset utf8Charset = Charset.forName ("UTF-8");
 
-  private ScrollView scrollView;
+  private DelayedScrollView scrollView;
   private int articleNumber;
 
   private static void throwEOF ()
@@ -238,8 +237,7 @@ public class ArticleActivity extends Activity
     return val;
   }
 
-  private LinearLayout loadArticle (int article,
-                                    int mark)
+  private LinearLayout loadArticle (int article)
     throws IOException
   {
     AssetManager assetManager = getAssets ();
@@ -287,11 +285,7 @@ public class ArticleActivity extends Activity
 
     Log.i (TAG, "Showing section " + section + " of article " + articleNumber);
 
-    /* If we're showing the first section then just scroll to the very top */
-    if (section > 0 && section < sectionHeaders.size ())
-      ypos = sectionHeaders.get (section).getTop ();
-
-    scrollView.scrollTo (0, ypos);
+    scrollView.delayedScrollTo (sectionHeaders.get (section));
   }
 
   @Override
@@ -300,7 +294,7 @@ public class ArticleActivity extends Activity
     super.onCreate (savedInstanceState);
 
     Intent intent = getIntent ();
-    scrollView = new ScrollView (this);
+    scrollView = new DelayedScrollView (this);
 
     setContentView (scrollView);
     sectionHeaders = new Vector<TextView> ();
@@ -315,7 +309,8 @@ public class ArticleActivity extends Activity
             try
               {
                 this.articleNumber = article;
-                scrollView.addView (loadArticle (article, mark));
+                scrollView.addView (loadArticle (article));
+                showSection (mark);
               }
             catch (IOException e)
               {
