@@ -1409,6 +1409,7 @@ pdb_db_add_kap_index (PdbDb *db,
                       PdbDbSection *section)
 {
   GString *buf = g_string_new (NULL);
+  const char *display_name, *real_name;
   PdbDocNode *node;
   PdbDbIndexEntry entry;
 
@@ -1437,10 +1438,23 @@ pdb_db_add_kap_index (PdbDb *db,
   entry.d.direct.section = section;
 
   pdb_db_trim_buf (buf);
+
+  if (buf->str[0] == '-' &&
+      buf->str[1])
+    {
+      real_name = buf->str + 1;
+      display_name = buf->str;
+    }
+  else
+    {
+      real_name = buf->str;
+      display_name = NULL;
+    }
+
   pdb_db_add_index_entry (db,
                           "eo", /* language code */
-                          buf->str, /* name */
-                          NULL, /* display name */
+                          real_name,
+                          display_name,
                           &entry);
 
   g_string_free (buf, TRUE);
