@@ -2001,6 +2001,30 @@ pdb_db_get_reference_cb (void *data,
     }
 }
 
+static void
+pdb_db_add_file_root_mark (PdbDb *db,
+                           const char *filename,
+                           PdbDbArticle *article)
+{
+  char *mark_name;
+
+  if (article->sections == NULL)
+    return;
+
+  mark_name = g_path_get_basename (filename);
+
+  /* Strip off the extension */
+  if (g_str_has_suffix (mark_name, ".xml"))
+    mark_name[strlen (mark_name) - 4] = '\0';
+
+  pdb_db_add_mark (db,
+                   article,
+                   article->sections->data,
+                   mark_name);
+
+  g_free (mark_name);
+}
+
 PdbDb *
 pdb_db_new (PdbRevo *revo,
             GError **error)
@@ -2055,13 +2079,29 @@ pdb_db_new (PdbRevo *revo,
           else
             {
               gboolean parse_result;
+              int old_len = db->articles->len;
 
               parse_result = pdb_db_parse_articles (db,
                                                     pdb_doc_get_root (doc),
                                                     error);
               pdb_doc_free (doc);
 
-              if (!parse_result)
+              if (parse_result)
+                {
+                  /* Some articles directly reference the filename
+                   * instead of a real mark so we need to add a mark
+                   * for each file */
+                  if (db->articles->len > old_len)
+                    {
+                      PdbDbArticle *article =
+                        g_ptr_array_index (db->articles, db->articles->len - 1);
+
+                      pdb_db_add_file_root_mark (db,
+                                                 file,
+                                                 article);
+                    }
+                }
+              else
                 {
                   pdb_db_free (db);
                   db = NULL;
