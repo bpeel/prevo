@@ -1317,6 +1317,42 @@ pdb_db_element_spans[] =
   };
 
 static gboolean
+pdb_db_should_ignore_spannable_tag (PdbDocElementNode *element)
+{
+  /* Skip citations, adm tags and pictures */
+  if (!strcmp (element->name, "fnt") ||
+      !strcmp (element->name, "adm") ||
+      !strcmp (element->name, "bld") ||
+      /* Ignore translations. They are handled separately */
+      !strcmp (element->name, "trd") ||
+      !strcmp (element->name, "trdgrp"))
+    return TRUE;
+
+  /* We want to ignore kap tags within a drv because they are handled
+   * separately and parsed into the section header. However, a kap tag
+   * can be found within an enclosing kap tag if it is a variation. In
+   * that case we do want it to be processed because the section
+   * header will be a comma-separated list. To detect this situation
+   * we'll just check if any parents are a kap tag */
+  if (!strcmp (element->name, "kap"))
+    {
+      PdbDocElementNode *parent;
+
+      for (parent = (PdbDocElementNode *) element->node.parent;
+           parent;
+           parent = (PdbDocElementNode *) parent->node.parent)
+        if (!strcmp (parent->name, "kap"))
+          goto embedded_kap;
+
+      /* If we make it here, the kap is a toplevel kap */
+      return TRUE;
+    }
+ embedded_kap:
+
+  return FALSE;
+}
+
+static gboolean
 pdb_db_parse_node (PdbDb *db,
                    PdbDbParseState *state,
                    PdbDocNode *node,
@@ -1336,22 +1372,9 @@ pdb_db_parse_node (PdbDb *db,
             pdb_db_start_text (state);
             pdb_db_append_tld (db, state->buf, element->atts);
           }
-        /* Skip citations, adm tags and pictures */
-        else if (!strcmp (element->name, "fnt") ||
-                 !strcmp (element->name, "adm") ||
-                 !strcmp (element->name, "bld") ||
-                 /* Ignore kap tags. They are parsed separately
-                  * into the section headers */
-                 !strcmp (element->name, "kap"))
+        else if (pdb_db_should_ignore_spannable_tag (element))
           {
-          }
-        else if (!strcmp (element->name, "trd"))
-          {
-            /* FIXME: do something here */
-          }
-        else if (!strcmp (element->name, "trdgrp"))
-          {
-            /* FIXME: do something here */
+            /* skip */
           }
         else if (element->node.first_child)
           {
@@ -1519,6 +1542,18 @@ pdb_db_add_kap_index (PdbDb *db,
 
           if (!strcmp (element->name, "tld"))
             pdb_db_append_tld (db, buf, element->atts);
+          else if (!strcmp (element->name, "var"))
+            {
+              PdbDocElementNode *child_element;
+
+              /* If the kap contains a variation with an embedded kap
+               * then we'll recursively add that to the index too */
+              child_element =
+                pdb_doc_get_child_element (&element->node, "kap");
+
+              if (child_element)
+                pdb_db_add_kap_index (db, child_element, article, section);
+            }
         }
         break;
       }
@@ -1528,6 +1563,15 @@ pdb_db_add_kap_index (PdbDb *db,
   entry.d.direct.section = section;
 
   pdb_db_trim_buf (buf);
+
+  /* If the <kap> tag contains variations then it will be a list with
+   * commas in. The variations are ignored in the index text so it
+   * will end up as an empty blob of trailing commas. Lets trim
+   * these */
+  while (buf->len > 0 &&
+         (buf->str[buf->len - 1] == ' ' ||
+          buf->str[buf->len - 1] == ','))
+    g_string_set_size (buf, buf->len - 1);
 
   if (buf->str[0] == '-' &&
       buf->str[1])
