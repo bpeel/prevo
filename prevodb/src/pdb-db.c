@@ -775,6 +775,38 @@ pdb_db_add_translation_index (PdbDb *db,
 }
 
 static gboolean
+pdb_db_is_empty_translation (PdbDocElementNode *element)
+{
+  PdbDocNode *node;
+
+  /* Some of the documents (eg, 'missupozi' for French) have empty
+   * translations. We want to totally skip these so that they don't
+   * mess up the index */
+
+  for (node = element->node.first_child; node; node = node->next)
+    switch (node->type)
+      {
+      case PDB_DOC_NODE_TYPE_TEXT:
+        {
+          PdbDocTextNode *text = (PdbDocTextNode *) node;
+          const char *end = text->data + text->len;
+          const char *p;
+
+          for (p = text->data; p < end; p++)
+            if (!g_ascii_isspace (*p))
+              return FALSE;
+        }
+        break;
+
+      case PDB_DOC_NODE_TYPE_ELEMENT:
+        if (!pdb_db_is_empty_translation ((PdbDocElementNode *) node))
+          return FALSE;
+      }
+
+  return TRUE;
+}
+
+static gboolean
 pdb_db_find_translations (PdbDb *db,
                           PdbDocElementNode *root_node,
                           GList **results,
@@ -808,21 +840,24 @@ pdb_db_find_translations (PdbDb *db,
           if (!strcmp (element->name, "trdgrp") ||
               !strcmp (element->name, "trd"))
             {
-              if (!pdb_db_handle_translation (db,
-                                              element,
-                                              translations,
-                                              error))
+              if (!pdb_db_is_empty_translation (element))
                 {
-                  ret = FALSE;
-                  break;
-                }
+                  if (!pdb_db_handle_translation (db,
+                                                  element,
+                                                  translations,
+                                                  error))
+                    {
+                      ret = FALSE;
+                      break;
+                    }
 
-              if (!pdb_db_add_translation_index (db,
-                                                 element,
-                                                 error))
-                {
-                  ret = FALSE;
-                  break;
+                  if (!pdb_db_add_translation_index (db,
+                                                     element,
+                                                     error))
+                    {
+                      ret = FALSE;
+                      break;
+                    }
                 }
             }
           else if (node->first_child &&
