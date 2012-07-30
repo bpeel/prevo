@@ -18,6 +18,8 @@ prevodb_SOURCES = \
 	pdb-mkdir.h \
 	pdb-revo.c \
 	pdb-revo.h \
+	pdb-roman.c \
+	pdb-roman.h \
 	pdb-strcmp.c \
 	pdb-strcmp.h \
 	pdb-trie.c \
