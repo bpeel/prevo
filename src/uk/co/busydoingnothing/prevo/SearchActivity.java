@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.inputmethod.InputMethodManager;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -91,6 +92,24 @@ public class SearchActivity extends ListActivity
           startActivity (intent);
         }
       });
+  }
+
+  @Override
+  public void onStart ()
+  {
+    super.onStart ();
+
+    View tv = findViewById (R.id.search_edit);
+
+    tv.requestFocus ();
+
+    InputMethodManager imm =
+      (InputMethodManager) getSystemService (INPUT_METHOD_SERVICE);
+
+    if (imm != null)
+      imm.showSoftInput (tv,
+                         0, /* flags */
+                         null /* resultReceiver */);
   }
 
   @Override
