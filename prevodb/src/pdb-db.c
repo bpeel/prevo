@@ -74,14 +74,6 @@ typedef struct
 
 typedef struct
 {
-  /* The span where the reference should be stored */
-  PdbDbSpan *span;
-  /* The original name of the reference */
-  char *name;
-} PdbDbReference;
-
-typedef struct
-{
   int length;
   char *text;
 
@@ -107,21 +99,20 @@ typedef struct
   GList *sections;
 } PdbDbArticle;
 
-typedef struct
-{
-  PdbDbArticle *article;
-  PdbDbSection *section;
-} PdbDbMark;
-
+/* A reference represents a position in an article. The reference can
+ * either directly contain a pointer to the section and article or it
+ * can refer to it indirectly via a mark name. These are used in a
+ * PdbDbLink to store the location the link refers to and also as the
+ * value of the index entries */
 typedef enum
 {
-  PDB_DB_INDEX_ENTRY_TYPE_MARK,
-  PDB_DB_INDEX_ENTRY_TYPE_DIRECT
-} PdbDbIndexEntryType;
+  PDB_DB_REFERENCE_TYPE_MARK,
+  PDB_DB_REFERENCE_TYPE_DIRECT
+} PdbDbReferenceType;
 
 typedef struct
 {
-  PdbDbIndexEntryType type;
+  PdbDbReferenceType type;
 
   union
   {
@@ -133,7 +124,25 @@ typedef struct
 
     char *mark;
   } d;
-} PdbDbIndexEntry;
+} PdbDbReference;
+
+/* A link stores a delayed reference to a section from a reference
+ * span. These are all collected in the 'references' list so that they
+ * can be resolved later once all of the articles are loaded */
+typedef struct
+{
+  PdbDbSpan *span;
+  PdbDbReference *reference;
+} PdbDbLink;
+
+/* PdbDbMark is only used as the value of the 'marks' hash table. This
+ * points to a particular secion in an article and is used to convert
+ * the mark name to its actual section */
+typedef struct
+{
+  PdbDbArticle *article;
+  PdbDbSection *section;
+} PdbDbMark;
 
 struct _PdbDb
 {
@@ -144,16 +153,19 @@ struct _PdbDb
   /* Temporary storage location for the word root. This is only valid
    * while parsing an article */
   char *word_root;
+  /* Temporary hash table of the translations indexed by language
+   * code. This only contains anything while parsing an article */
+  GHashTable *translations;
 
   GHashTable *marks;
 
-  /* This is a list of references. Each reference contains the
-   * original reference id from the XML file and a pointer to the
-   * span. The data in the span will be replaced by an article and
-   * mark number as a post-processing step once all of the articles
-   * have been read so that the references can be resolved. The
-   * references are sorted by the offset */
-  GList *references;
+  /* This is a list of links. Each link contains a reference to a
+   * section (either directly a pointer or a mark name) and and a
+   * pointer to the span. The data in the span will be replaced by an
+   * article and mark number as a post-processing step once all of the
+   * articles have been read so that the references can be resolved.
+   * The links are sorted by the offset */
+  GList *links;
 };
 
 typedef struct
@@ -205,33 +217,33 @@ pdb_db_trim_buf (GString *buf)
 }
 
 static void
-pdb_db_index_entry_free (PdbDbIndexEntry *entry)
+pdb_db_reference_free (PdbDbReference *entry)
 {
   switch (entry->type)
     {
-    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+    case PDB_DB_REFERENCE_TYPE_MARK:
       g_free (entry->d.mark);
       break;
 
-    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+    case PDB_DB_REFERENCE_TYPE_DIRECT:
       break;
     }
 
-  g_slice_free (PdbDbIndexEntry, entry);
+  g_slice_free (PdbDbReference, entry);
 }
 
-static PdbDbIndexEntry *
-pdb_db_index_entry_copy (const PdbDbIndexEntry *entry_in)
+static PdbDbReference *
+pdb_db_reference_copy (const PdbDbReference *entry_in)
 {
-  PdbDbIndexEntry *entry_out = g_slice_dup (PdbDbIndexEntry, entry_in);
+  PdbDbReference *entry_out = g_slice_dup (PdbDbReference, entry_in);
 
   switch (entry_in->type)
     {
-    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+    case PDB_DB_REFERENCE_TYPE_MARK:
       entry_out->d.mark = g_strdup (entry_out->d.mark);
       break;
 
-    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+    case PDB_DB_REFERENCE_TYPE_DIRECT:
       break;
     }
 
@@ -239,18 +251,25 @@ pdb_db_index_entry_copy (const PdbDbIndexEntry *entry_in)
 }
 
 static void
+pdb_db_link_free (PdbDbLink *link)
+{
+  pdb_db_reference_free (link->reference);
+  g_slice_free (PdbDbLink, link);
+}
+
+static void
 pdb_db_add_index_entry (PdbDb *db,
                         const char *lang,
                         const char *name,
                         const char *display_name,
-                        const PdbDbIndexEntry *entry_in)
+                        const PdbDbReference *entry_in)
 {
   PdbTrie *trie = pdb_lang_get_trie (db->lang, lang);
 
   if (trie)
     {
-      PdbDbIndexEntry *entry =
-        pdb_db_index_entry_copy (entry_in);
+      PdbDbReference *entry =
+        pdb_db_reference_copy (entry_in);
       const char *p;
 
       /* Check if any of the characters in the name are upper case */
@@ -318,14 +337,6 @@ static void
 pdb_db_mark_free (PdbDbMark *mark)
 {
   g_slice_free (PdbDbMark, mark);
-}
-
-
-static void
-pdb_db_reference_free (PdbDbReference *ref)
-{
-  g_free (ref->name);
-  g_slice_free (PdbDbReference, ref);
 }
 
 static void
@@ -477,17 +488,17 @@ pdb_db_get_innermost_mark (PdbDocNode *node)
 static gboolean
 pdb_db_get_trd_link (PdbDb *db,
                      PdbDocElementNode *trd_elem,
+                     const PdbDbReference *reference,
                      GString *buf,
                      GQueue *spans,
                      GError **error)
 {
   PdbDocElementNode *parent, *kap;
   PdbDocNode *n;
-  const char *mark;
   int sence_num = -1;
   int subsence_num = -1;
   PdbDbSpan *span;
-  PdbDbReference *reference;
+  PdbDbLink *link;
   int span_start, span_end;
 
   /* Check that the parent is either <snc> or <subsnc> */
@@ -521,16 +532,6 @@ pdb_db_get_trd_link (PdbDb *db,
                    "%s tag found with unknown parent %s",
                    trd_elem->name,
                    parent->name);
-      return FALSE;
-    }
-
-  if ((mark = pdb_db_get_innermost_mark (&trd_elem->node)) == NULL)
-    {
-      g_set_error (error,
-                   PDB_ERROR,
-                   PDB_ERROR_BAD_FORMAT,
-                   "%s tag found with no containing mrk attriute",
-                   trd_elem->name);
       return FALSE;
     }
 
@@ -598,181 +599,13 @@ pdb_db_get_trd_link (PdbDb *db,
   span->type = PDB_DB_SPAN_REFERENCE;
   g_queue_push_tail (spans, span);
 
-  reference = g_slice_new (PdbDbReference);
-  reference->span = span;
-  reference->name = g_strdup (mark);
-  db->references = g_list_prepend (db->references, reference);
+  link = g_slice_new (PdbDbLink);
+  link->span = span;
+  link->reference = pdb_db_reference_copy (reference);
+
+  db->links = g_list_prepend (db->links, link);
 
   return TRUE;
-}
-
-static gboolean
-pdb_db_handle_translation (PdbDb *db,
-                           PdbDocElementNode *element,
-                           GHashTable *translations,
-                           GError **error)
-{
-  const char *lang_code = pdb_doc_get_attribute (element, "lng");
-  PdbDbTranslationData *data;
-  GString *content;
-
-  if (lang_code == NULL)
-    {
-      g_set_error (error,
-                   PDB_ERROR,
-                   PDB_ERROR_BAD_FORMAT,
-                   "%s element with no lng attribute",
-                   element->name);
-      return FALSE;
-    }
-
-  if ((data = g_hash_table_lookup (translations,
-                                   lang_code)) == NULL)
-    {
-      data = g_slice_new (PdbDbTranslationData);
-      data->buf = g_string_new (NULL);
-      g_queue_init (&data->spans);
-      g_hash_table_insert (translations,
-                           g_strdup (lang_code),
-                           data);
-    }
-  else if (data->buf->len > 0)
-    g_string_append (data->buf, "; ");
-
-  if (!pdb_db_get_trd_link (db,
-                            element,
-                            data->buf,
-                            &data->spans,
-                            error))
-    return FALSE;
-
-  g_string_append (data->buf, ": ");
-
-  content = g_string_new (NULL);
-  pdb_doc_append_element_text (element, content);
-  pdb_db_trim_buf (content);
-  g_string_append_len (data->buf, content->str, content->len);
-  g_string_free (content, TRUE);
-
-  return TRUE;
-}
-
-static gboolean
-pdb_db_add_trd_index (PdbDb *db,
-                      PdbDocElementNode *element,
-                      const char *lang_code,
-                      GError **error)
-{
-  PdbDocElementNode *ind;
-  PdbDbIndexEntry entry;
-  GString *display_name;
-  const char *mark;
-
-  mark = pdb_db_get_innermost_mark (&element->node);
-
-  if (mark == NULL)
-    {
-      fprintf (stderr,
-               "%s element found with no containing mrk attribute",
-               element->name);
-      return TRUE;
-    }
-
-  entry.type = PDB_DB_INDEX_ENTRY_TYPE_MARK;
-  entry.d.mark = (char *) mark;
-
-  display_name = g_string_new (NULL);
-
-  pdb_doc_append_element_text_with_ignore (element,
-                                           display_name,
-                                           "ofc",
-                                           NULL);
-  pdb_db_trim_buf (display_name);
-
-  if ((ind = pdb_doc_get_child_element (&element->node, "ind")))
-    {
-      GString *real_name = g_string_new (NULL);
-
-      pdb_doc_append_element_text (ind, real_name);
-      pdb_db_trim_buf (real_name);
-
-      pdb_db_add_index_entry (db,
-                              lang_code,
-                              real_name->str,
-                              display_name->str,
-                              &entry);
-
-      g_string_free (real_name, TRUE);
-    }
-  else if (pdb_doc_element_has_child_element (element))
-    {
-      GString *real_name = g_string_new (NULL);
-
-      /* We don't want <klr> tags in the index name */
-      pdb_doc_append_element_text_with_ignore (element,
-                                               real_name,
-                                               "ofc",
-                                               "klr",
-                                               NULL);
-      pdb_db_trim_buf (real_name);
-
-      pdb_db_add_index_entry (db,
-                              lang_code,
-                              real_name->str,
-                              display_name->str,
-                              &entry);
-
-      g_string_free (real_name, TRUE);
-    }
-  else
-    {
-      pdb_db_add_index_entry (db,
-                              lang_code,
-                              display_name->str,
-                              NULL,
-                              &entry);
-    }
-
-  g_string_free (display_name, TRUE);
-
-  return TRUE;
-}
-
-static gboolean
-pdb_db_add_translation_index (PdbDb *db,
-                              PdbDocElementNode *element,
-                              GError **error)
-{
-  const char *lang_code;
-
-  lang_code = pdb_doc_get_attribute (element, "lng");
-
-  if (lang_code == NULL)
-    {
-      g_set_error (error,
-                   PDB_ERROR,
-                   PDB_ERROR_BAD_FORMAT,
-                   "%s element with no lng attribute",
-                   element->name);
-      return FALSE;
-    }
-
-  if (!strcmp (element->name, "trdgrp"))
-    {
-      PdbDocNode *node;
-
-      for (node = element->node.first_child; node; node = node->next)
-        if (node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
-            !pdb_db_add_trd_index (db,
-                                   (PdbDocElementNode *) node,
-                                   lang_code,
-                                   error))
-          return FALSE;
-
-      return TRUE;
-    }
-  else
-    return pdb_db_add_trd_index (db, element, lang_code, error);
 }
 
 static gboolean
@@ -808,23 +641,196 @@ pdb_db_is_empty_translation (PdbDocElementNode *element)
 }
 
 static gboolean
-pdb_db_find_translations (PdbDb *db,
-                          PdbDocElementNode *root_node,
-                          GList **results,
-                          GError **error)
+pdb_db_add_trd_index (PdbDb *db,
+                      PdbDocElementNode *element,
+                      const char *lang_code,
+                      const PdbDbReference *reference,
+                      GError **error)
+{
+  PdbDocElementNode *ind;
+  GString *display_name;
+  const char *mark;
+
+  mark = pdb_db_get_innermost_mark (&element->node);
+
+  if (mark == NULL)
+    {
+      fprintf (stderr,
+               "%s element found with no containing mrk attribute",
+               element->name);
+      return TRUE;
+    }
+
+  display_name = g_string_new (NULL);
+
+  pdb_doc_append_element_text_with_ignore (element,
+                                           display_name,
+                                           "ofc",
+                                           NULL);
+  pdb_db_trim_buf (display_name);
+
+  if ((ind = pdb_doc_get_child_element (&element->node, "ind")))
+    {
+      GString *real_name = g_string_new (NULL);
+
+      pdb_doc_append_element_text (ind, real_name);
+      pdb_db_trim_buf (real_name);
+
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              real_name->str,
+                              display_name->str,
+                              reference);
+
+      g_string_free (real_name, TRUE);
+    }
+  else if (pdb_doc_element_has_child_element (element))
+    {
+      GString *real_name = g_string_new (NULL);
+
+      /* We don't want <klr> tags in the index name */
+      pdb_doc_append_element_text_with_ignore (element,
+                                               real_name,
+                                               "ofc",
+                                               "klr",
+                                               NULL);
+      pdb_db_trim_buf (real_name);
+
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              real_name->str,
+                              display_name->str,
+                              reference);
+
+      g_string_free (real_name, TRUE);
+    }
+  else
+    {
+      pdb_db_add_index_entry (db,
+                              lang_code,
+                              display_name->str,
+                              NULL,
+                              reference);
+    }
+
+  g_string_free (display_name, TRUE);
+
+  return TRUE;
+}
+
+static gboolean
+pdb_db_add_translation_index (PdbDb *db,
+                              PdbDocElementNode *element,
+                              const PdbDbReference *reference,
+                              GError **error)
+{
+  const char *lang_code;
+
+  lang_code = pdb_doc_get_attribute (element, "lng");
+
+  if (lang_code == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "%s element with no lng attribute",
+                   element->name);
+      return FALSE;
+    }
+
+  if (!strcmp (element->name, "trdgrp"))
+    {
+      PdbDocNode *node;
+
+      for (node = element->node.first_child; node; node = node->next)
+        if (node->type == PDB_DOC_NODE_TYPE_ELEMENT &&
+            !pdb_db_add_trd_index (db,
+                                   (PdbDocElementNode *) node,
+                                   lang_code,
+                                   reference,
+                                   error))
+          return FALSE;
+
+      return TRUE;
+    }
+  else
+    return pdb_db_add_trd_index (db, element, lang_code, reference, error);
+}
+
+static gboolean
+pdb_db_handle_translation (PdbDb *db,
+                           PdbDocElementNode *element,
+                           const PdbDbReference *reference,
+                           GError **error)
+{
+  const char *lang_code;
+  PdbDbTranslationData *data;
+  GString *content;
+
+  /* Silently ignore empty translations */
+  if (pdb_db_is_empty_translation (element))
+    return TRUE;
+
+  lang_code = pdb_doc_get_attribute (element, "lng");
+
+  if (lang_code == NULL)
+    {
+      g_set_error (error,
+                   PDB_ERROR,
+                   PDB_ERROR_BAD_FORMAT,
+                   "%s element with no lng attribute",
+                   element->name);
+      return FALSE;
+    }
+
+  if ((data = g_hash_table_lookup (db->translations,
+                                   lang_code)) == NULL)
+    {
+      data = g_slice_new (PdbDbTranslationData);
+      data->buf = g_string_new (NULL);
+      g_queue_init (&data->spans);
+      g_hash_table_insert (db->translations,
+                           g_strdup (lang_code),
+                           data);
+    }
+  else if (data->buf->len > 0)
+    g_string_append (data->buf, "; ");
+
+  if (!pdb_db_get_trd_link (db,
+                            element,
+                            reference,
+                            data->buf,
+                            &data->spans,
+                            error))
+    return FALSE;
+
+  g_string_append (data->buf, ": ");
+
+  content = g_string_new (NULL);
+  pdb_doc_append_element_text (element, content);
+  pdb_db_trim_buf (content);
+  g_string_append_len (data->buf, content->str, content->len);
+  g_string_free (content, TRUE);
+
+  return pdb_db_add_translation_index (db,
+                                       element,
+                                       reference,
+                                       error);
+}
+
+static gboolean
+pdb_db_find_translations_recursive (PdbDb *db,
+                                    PdbDocElementNode *root_node,
+                                    const PdbDbReference *reference,
+                                    GError **error)
 {
   GPtrArray *stack;
   gboolean ret = TRUE;
-  GHashTable *translations;
-
-  translations = g_hash_table_new_full (g_str_hash,
-                                        g_str_equal,
-                                        (GDestroyNotify) g_free,
-                                        pdb_db_free_translation_data_cb);
 
   stack = g_ptr_array_new ();
 
-  g_ptr_array_add (stack, root_node);
+  if (root_node->node.first_child)
+    g_ptr_array_add (stack, root_node->node.first_child);
 
   while (stack->len > 0)
     {
@@ -841,24 +847,13 @@ pdb_db_find_translations (PdbDb *db,
           if (!strcmp (element->name, "trdgrp") ||
               !strcmp (element->name, "trd"))
             {
-              if (!pdb_db_is_empty_translation (element))
+              if (!pdb_db_handle_translation (db,
+                                              element,
+                                              reference,
+                                              error))
                 {
-                  if (!pdb_db_handle_translation (db,
-                                                  element,
-                                                  translations,
-                                                  error))
-                    {
-                      ret = FALSE;
-                      break;
-                    }
-
-                  if (!pdb_db_add_translation_index (db,
-                                                     element,
-                                                     error))
-                    {
-                      ret = FALSE;
-                      break;
-                    }
+                  ret = FALSE;
+                  break;
                 }
             }
           else if (node->first_child &&
@@ -872,55 +867,87 @@ pdb_db_find_translations (PdbDb *db,
 
   g_ptr_array_free (stack, TRUE);
 
-  if (ret)
-    {
-      GQueue sections;
-      GList *keys, *l;
+  return ret;
+}
 
-      g_queue_init (&sections);
+static gboolean
+pdb_db_find_translations (PdbDb *db,
+                          PdbDocElementNode *root_node,
+                          const PdbDbReference *reference,
+                          GError **error)
+{
+  PdbDocNode *node;
+  gboolean ret = TRUE;
 
-      keys = g_hash_table_get_keys (translations);
+  for (node = root_node->node.first_child; node; node = node->next)
+    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
+      {
+        PdbDocElementNode *element = (PdbDocElementNode *) node;
 
-      keys = g_list_sort_with_data (keys,
-                                    pdb_db_compare_language_code,
-                                    db);
-      for (l = keys; l; l = l->next)
-        {
-          const char *lang_code = l->data;
-          const char *lang_name = pdb_lang_get_name (db->lang, lang_code);
-          PdbDbTranslationData *data =
-            g_hash_table_lookup (translations, lang_code);
-          PdbDbSection *section = g_slice_new (PdbDbSection);
-
-          if (lang_name == NULL)
-            lang_name = lang_code;
-
-          section->title.length = strlen (lang_name);
-          section->title.text = g_strdup (lang_name);
-          section->title.spans = NULL;
-
-          section->text.length = data->buf->len;
-          section->text.text = g_string_free (data->buf, FALSE);
-          section->text.spans = data->spans.head;
-
-          data->buf = NULL;
-          g_queue_init (&data->spans);
-
-          g_queue_push_tail (&sections, section);
-        }
-
-      g_list_free (keys);
-
-      *results = sections.head;
-    }
-
-  g_hash_table_destroy (translations);
+        if (!strcmp (element->name, "trdgrp") ||
+            !strcmp (element->name, "trd"))
+          {
+            if (!pdb_db_handle_translation (db,
+                                            element,
+                                            reference,
+                                            error))
+              {
+                ret = FALSE;
+                break;
+              }
+          }
+      }
 
   return ret;
 }
 
+static GList *
+pdb_db_flush_translations (PdbDb *db)
+{
+  GQueue sections;
+  GList *keys, *l;
+
+  g_queue_init (&sections);
+
+  keys = g_hash_table_get_keys (db->translations);
+
+  keys = g_list_sort_with_data (keys,
+                                pdb_db_compare_language_code,
+                                db);
+  for (l = keys; l; l = l->next)
+    {
+      const char *lang_code = l->data;
+      const char *lang_name = pdb_lang_get_name (db->lang, lang_code);
+      PdbDbTranslationData *data =
+        g_hash_table_lookup (db->translations, lang_code);
+      PdbDbSection *section = g_slice_new (PdbDbSection);
+
+      if (lang_name == NULL)
+        lang_name = lang_code;
+
+      section->title.length = strlen (lang_name);
+      section->title.text = g_strdup (lang_name);
+      section->title.spans = NULL;
+
+      section->text.length = data->buf->len;
+      section->text.text = g_string_free (data->buf, FALSE);
+      section->text.spans = data->spans.head;
+
+      data->buf = NULL;
+      g_queue_init (&data->spans);
+
+      g_queue_push_tail (&sections, section);
+    }
+
+  g_list_free (keys);
+
+  g_hash_table_remove_all (db->translations);
+
+  return sections.head;
+}
+
 static void
-pdb_db_resolve_references (PdbDb *db)
+pdb_db_resolve_links (PdbDb *db)
 {
   int article_num;
   GList *l;
@@ -941,24 +968,41 @@ pdb_db_resolve_references (PdbDb *db)
         }
     }
 
-  /* Resolve all of the references */
-  for (l = db->references; l; l = l->next)
+  /* Resolve all of the links */
+  for (l = db->links; l; l = l->next)
     {
-      PdbDbReference *ref = l->data;
-      PdbDbMark *mark = g_hash_table_lookup (db->marks, ref->name);
+      PdbDbLink *link = l->data;
+      PdbDbReference *ref = link->reference;
 
-      if (mark)
+      switch (ref->type)
         {
-          ref->span->data1 = mark->article->article_num;
-          ref->span->data2 = mark->section->section_num;
-        }
-      else
-        {
-          ref->span->data1 = 0;
-          ref->span->data2 = 0;
-          fprintf (stderr,
-                   "no mark found for reference \"%s\"\n",
-                   ref->name);
+        case PDB_DB_REFERENCE_TYPE_MARK:
+          {
+            PdbDbMark *mark =
+              g_hash_table_lookup (db->marks, ref->d.mark);
+
+            if (mark)
+              {
+                link->span->data1 = mark->article->article_num;
+                link->span->data2 = mark->section->section_num;
+              }
+            else
+              {
+                link->span->data1 = 0;
+                link->span->data2 = 0;
+                fprintf (stderr,
+                         "no mark found for reference \"%s\"\n",
+                         ref->d.mark);
+              }
+          }
+          break;
+
+        case PDB_DB_REFERENCE_TYPE_DIRECT:
+          {
+            link->span->data1 = ref->d.direct.article->article_num;
+            link->span->data2 = ref->d.direct.section->section_num;
+          }
+          break;
         }
     }
 }
@@ -1172,6 +1216,7 @@ pdb_db_handle_ref (PdbDb *db,
                    GError **error)
 {
   PdbDbReference *reference;
+  PdbDbLink *link;
   char **att;
 
   for (att = element->atts; att[0]; att += 2)
@@ -1190,10 +1235,15 @@ pdb_db_handle_ref (PdbDb *db,
 
   span = pdb_db_start_span (state, PDB_DB_SPAN_REFERENCE);
 
+  link = g_slice_new (PdbDbLink);
+  link->span = span;
+
   reference = g_slice_new (PdbDbReference);
-  reference->span = span;
-  reference->name = g_strdup (att[1]);
-  db->references = g_list_prepend (db->references, reference);
+  reference->type = PDB_DB_REFERENCE_TYPE_MARK;
+  reference->d.mark = g_strdup (att[1]);
+  link->reference = reference;
+
+  db->links = g_list_prepend (db->links, link);
 
   return TRUE;
 }
@@ -1524,7 +1574,7 @@ pdb_db_add_kap_index (PdbDb *db,
   GString *buf = g_string_new (NULL);
   const char *display_name, *real_name;
   PdbDocNode *node;
-  PdbDbIndexEntry entry;
+  PdbDbReference entry;
 
   for (node = kap->node.first_child; node; node = node->next)
     switch (node->type)
@@ -1558,7 +1608,7 @@ pdb_db_add_kap_index (PdbDb *db,
         break;
       }
 
-  entry.type = PDB_DB_INDEX_ENTRY_TYPE_DIRECT;
+  entry.type = PDB_DB_REFERENCE_TYPE_DIRECT;
   entry.d.direct.article = article;
   entry.d.direct.section = section;
 
@@ -1691,6 +1741,7 @@ pdb_db_parse_subart (PdbDb *db,
   PdbDocNode *node;
   PdbDocElementNode *drv;
   PdbDbSection *section;
+  PdbDbReference ref;
   GString *buf;
   int subart_num;
 
@@ -1709,6 +1760,10 @@ pdb_db_parse_subart (PdbDb *db,
   section->title.length = buf->len;
   section->title.text = g_string_free (buf, FALSE);
   section->title.spans = NULL;
+
+  ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
+  ref.d.direct.article = article;
+  ref.d.direct.section = section;
 
   /* Let's assume the sub-article will either be a collection of
    * <drv>s or directly a spannable string, not a mix */
@@ -1732,6 +1787,13 @@ pdb_db_parse_subart (PdbDb *db,
               g_slice_free (PdbDbSection, section);
               return FALSE;
             }
+
+          if (!pdb_db_find_translations_recursive (db,
+                                                   (PdbDocElementNode *) node,
+                                                   &ref,
+                                                   error))
+            return FALSE;
+
           node = node->next;
         }
       else
@@ -1742,6 +1804,12 @@ pdb_db_parse_subart (PdbDb *db,
         }
 
       g_queue_push_tail (sections, section);
+
+      if (!pdb_db_find_translations (db,
+                                     root_node,
+                                     &ref,
+                                     error))
+        return FALSE;
 
       for (; node; node = node->next)
         switch (node->type)
@@ -1759,7 +1827,17 @@ pdb_db_parse_subart (PdbDb *db,
                   if (section == NULL)
                     return FALSE;
                   else
-                    g_queue_push_tail (sections, section);
+                    {
+                      g_queue_push_tail (sections, section);
+
+                      ref.d.direct.section = section;
+
+                      if (!pdb_db_find_translations_recursive (db,
+                                                               element,
+                                                               &ref,
+                                                               error))
+                        return FALSE;
+                    }
                 }
               else if (strcmp (element->name, "adm") &&
                        strcmp (element->name, "trd") &&
@@ -1807,7 +1885,15 @@ pdb_db_parse_subart (PdbDb *db,
       return FALSE;
     }
   else
-    g_queue_push_tail (sections, section);
+    {
+      g_queue_push_tail (sections, section);
+
+      if (!pdb_db_find_translations_recursive (db,
+                                               root_node,
+                                               &ref,
+                                               error))
+        return FALSE;
+    }
 
   return TRUE;
 }
@@ -1861,13 +1947,30 @@ pdb_db_parse_article (PdbDb *db,
             if (!strcmp (element->name, "drv"))
               {
                 PdbDbSection *section;
+                PdbDbReference ref;
 
                 section = pdb_db_parse_drv (db, article, element, error);
 
                 if (section == NULL)
-                  result = FALSE;
-                else
-                  g_queue_push_tail (&sections, section);
+                  {
+                    result = FALSE;
+                    break;
+                  }
+
+                g_queue_push_tail (&sections, section);
+
+                ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
+                ref.d.direct.article = article;
+                ref.d.direct.section = section;
+
+                if (!pdb_db_find_translations_recursive (db,
+                                                         element,
+                                                         &ref,
+                                                         error))
+                  {
+                    result = FALSE;
+                    break;
+                  }
               }
             else if (!strcmp (element->name, "subart"))
               {
@@ -1876,19 +1979,28 @@ pdb_db_parse_article (PdbDb *db,
                                           element,
                                           &sections,
                                           error))
-                  result = FALSE;
+                  {
+                    result = FALSE;
+                    break;
+                  }
               }
           }
 
       if (result)
         {
-          GList *translations;
+          PdbDbReference ref;
 
-          if (pdb_db_find_translations (db,
-                                        root_node,
-                                        &translations,
-                                        error))
+          ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
+          ref.d.direct.article = article;
+
+          if (sections.head == NULL ||
+              (ref.d.direct.section = sections.head->data,
+               pdb_db_find_translations (db,
+                                         root_node,
+                                         &ref,
+                                         error)))
             {
+              GList *translations = pdb_db_flush_translations (db);
               int length = g_list_length (translations);
 
               if (length > 0)
@@ -1960,7 +2072,7 @@ static void
 pdb_db_free_data_cb (void *data,
                      void *user_data)
 {
-  pdb_db_index_entry_free (data);
+  pdb_db_reference_free (data);
 }
 
 static void
@@ -1970,11 +2082,11 @@ pdb_db_get_reference_cb (void *data,
                          void *user_data)
 {
   PdbDb *db = user_data;
-  PdbDbIndexEntry *entry = data;
+  PdbDbReference *entry = data;
 
   switch (entry->type)
     {
-    case PDB_DB_INDEX_ENTRY_TYPE_MARK:
+    case PDB_DB_REFERENCE_TYPE_MARK:
       {
         PdbDbMark *mark = g_hash_table_lookup (db->marks, entry->d.mark);
 
@@ -1994,7 +2106,7 @@ pdb_db_get_reference_cb (void *data,
       }
       break;
 
-    case PDB_DB_INDEX_ENTRY_TYPE_DIRECT:
+    case PDB_DB_REFERENCE_TYPE_DIRECT:
       *article_num = entry->d.direct.article->article_num;
       *mark_num = entry->d.direct.section->section_num;
       break;
@@ -2047,12 +2159,17 @@ pdb_db_new (PdbRevo *revo,
     }
 
   db->articles = g_ptr_array_new ();
-  db->references = NULL;
+  db->links = NULL;
 
   db->marks = g_hash_table_new_full (g_str_hash,
                                      g_str_equal,
                                      g_free,
                                      (GDestroyNotify) pdb_db_mark_free);
+
+  db->translations = g_hash_table_new_full (g_str_hash,
+                                            g_str_equal,
+                                            (GDestroyNotify) g_free,
+                                            pdb_db_free_translation_data_cb);
 
   files = pdb_revo_list_files (revo, "xml/*.xml", error);
 
@@ -2114,23 +2231,23 @@ pdb_db_new (PdbRevo *revo,
     }
 
   if (db)
-    pdb_db_resolve_references (db);
+    pdb_db_resolve_links (db);
 
   return db;
 }
 
 static void
-pdb_db_free_reference_cb (void *ptr,
-                          void *user_data)
+pdb_db_free_link_cb (void *ptr,
+                     void *user_data)
 {
-  pdb_db_reference_free (ptr);
+  pdb_db_link_free (ptr);
 }
 
 static void
-pdb_db_free_reference_list (GList *references)
+pdb_db_free_link_list (GList *links)
 {
-  g_list_foreach (references, pdb_db_free_reference_cb, NULL);
-  g_list_free (references);
+  g_list_foreach (links, pdb_db_free_link_cb, NULL);
+  g_list_free (links);
 }
 
 void
@@ -2152,9 +2269,10 @@ pdb_db_free (PdbDb *db)
 
   g_ptr_array_free (db->articles, TRUE);
 
-  pdb_db_free_reference_list (db->references);
+  pdb_db_free_link_list (db->links);
 
   g_hash_table_destroy (db->marks);
+  g_hash_table_destroy (db->translations);
 
   g_slice_free (PdbDb, db);
 }
