@@ -427,6 +427,22 @@ pdb_db_get_element_num (PdbDocElementNode *element)
     return num;
 }
 
+static void
+pdb_db_add_mark (PdbDb *db,
+                 PdbDbArticle *article,
+                 PdbDbSection *section,
+                 const char *mark_name)
+{
+  PdbDbMark *mark = g_slice_new (PdbDbMark);
+
+  mark->article = article;
+  mark->section = section;
+
+  g_hash_table_insert (db->marks,
+                       g_strdup (mark_name),
+                       mark);
+}
+
 typedef struct
 {
   GString *buf;
@@ -797,6 +813,14 @@ pdb_db_find_translations_recursive (PdbDb *db,
 {
   GPtrArray *stack;
   gboolean ret = TRUE;
+  const char *mrk;
+
+  if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
+      (mrk = pdb_doc_get_attribute (root_node, "mrk")))
+    pdb_db_add_mark (db,
+                     reference->d.direct.article,
+                     reference->d.direct.section,
+                     mrk);
 
   stack = g_ptr_array_new ();
 
@@ -833,6 +857,13 @@ pdb_db_find_translations_recursive (PdbDb *db,
                    strcmp (element->name, "adm") &&
                    strcmp (element->name, "fnt"))
             g_ptr_array_add (stack, node->first_child);
+
+          if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
+              (mrk = pdb_doc_get_attribute (element, "mrk")))
+            pdb_db_add_mark (db,
+                             reference->d.direct.article,
+                             reference->d.direct.section,
+                             mrk);
         }
     }
 
@@ -849,6 +880,14 @@ pdb_db_find_translations (PdbDb *db,
 {
   PdbDocNode *node;
   gboolean ret = TRUE;
+  const char *mrk;
+
+  if (reference->type == PDB_DB_REFERENCE_TYPE_DIRECT &&
+      (mrk = pdb_doc_get_attribute (root_node, "mrk")))
+    pdb_db_add_mark (db,
+                     reference->d.direct.article,
+                     reference->d.direct.section,
+                     mrk);
 
   for (node = root_node->node.first_child; node; node = node->next)
     if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
@@ -1615,43 +1654,6 @@ pdb_db_add_kap_index (PdbDb *db,
   g_string_free (buf, TRUE);
 }
 
-static void
-pdb_db_add_mark (PdbDb *db,
-                 PdbDbArticle *article,
-                 PdbDbSection *section,
-                 const char *mark_name)
-{
-  PdbDbMark *mark = g_slice_new (PdbDbMark);
-
-  mark->article = article;
-  mark->section = section;
-
-  g_hash_table_insert (db->marks,
-                       g_strdup (mark_name),
-                       mark);
-}
-
-static void
-pdb_db_add_marks (PdbDb *db,
-                  PdbDbArticle *article,
-                  PdbDbSection *section,
-                  PdbDocElementNode *element)
-{
-  char **att;
-  PdbDocNode *node;
-
-  for (att = element->atts; att[0]; att += 2)
-    if (!strcmp (att[0], "mrk"))
-      {
-        pdb_db_add_mark (db, article, section, att[1]);
-        break;
-      }
-
-  for (node = element->node.first_child; node; node = node->next)
-    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
-      pdb_db_add_marks (db, article, section, (PdbDocElementNode *) node);
-}
-
 static PdbDbSection *
 pdb_db_parse_drv (PdbDb *db,
                   PdbDbArticle *article,
@@ -1674,8 +1676,6 @@ pdb_db_parse_drv (PdbDb *db,
     }
 
   section = g_slice_new (PdbDbSection);
-
-  pdb_db_add_marks (db, article, section, root_node);
 
   pdb_db_add_kap_index (db, kap, article, section);
 
