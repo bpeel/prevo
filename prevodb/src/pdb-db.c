@@ -467,24 +467,6 @@ pdb_db_compare_language_code (const void *a,
   return pdb_strcmp (name_a, name_b);
 }
 
-static const char *
-pdb_db_get_innermost_mark (PdbDocNode *node)
-{
-  while (node)
-    if (node->type == PDB_DOC_NODE_TYPE_ELEMENT)
-      {
-        PdbDocElementNode *element = (PdbDocElementNode *) node;
-        const char *mark = pdb_doc_get_attribute (element, "mrk");
-
-        if (mark)
-          return mark;
-
-        node = node->parent;
-      }
-
-  return NULL;
-}
-
 static gboolean
 pdb_db_get_trd_link (PdbDb *db,
                      PdbDocElementNode *trd_elem,
@@ -649,17 +631,6 @@ pdb_db_add_trd_index (PdbDb *db,
 {
   PdbDocElementNode *ind;
   GString *display_name;
-  const char *mark;
-
-  mark = pdb_db_get_innermost_mark (&element->node);
-
-  if (mark == NULL)
-    {
-      fprintf (stderr,
-               "%s element found with no containing mrk attribute",
-               element->name);
-      return TRUE;
-    }
 
   display_name = g_string_new (NULL);
 
