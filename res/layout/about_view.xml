@@ -17,21 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<resources>
-  <string name="app_name">PReVo</string>
-  <string name="select_language">Elektu lingvon</string>
-  <string name="search">Serĉu</string>
-  <string name="no_results">Neniuj vortoj troviĝis</string>
-  <string name="type_to_filter">Tajpu ion por serĉi</string>
-  <string name="menu_home">Hejmo</string>
-  <string name="menu_about">Pri</string>
-  <string name="close">Fermu</string>
-  <string name="about_message">
-<b>PReVo 0.1</b>\n
-\nCopyright ⓒ 2012 Neil Roberts\n
-\nLa datumo por la vortaro venas de Reta Vortaro.\n
-\nThis program comes with ABSOLUTELY NO WARRANTY. This is free
-software and you are welcome to redistribute it under certain
-conditions. Click here for details.
-  </string>
-</resources>
+<TextView xmlns:a="http://schemas.android.com/apk/res/android"
+          a:id="@+id/about_view"
+          a:layout_width="match_parent"
+          a:layout_height="wrap_content"
+          a:padding="6sp"
+          style="?android:attr/textAppearanceMedium" />
