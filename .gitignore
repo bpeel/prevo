@@ -24,7 +24,7 @@
 /prevodb/src/test-doc
 /prevodb/stamp-h1
 
-/assets/articles/article-*.xml
+/assets/articles/article-*.bin
 /assets/indices/index-*.bin
 /res/xml/languages.xml
 
