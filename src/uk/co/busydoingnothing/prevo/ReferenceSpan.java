@@ -39,9 +39,6 @@ public class ReferenceSpan extends ClickableSpan
   @Override
   public void onClick (View view)
   {
-    Log.i (TAG,
-           "Jumping to article (" + articleNumber + "," + sectionNumber + ")");
-
     Intent intent = new Intent (view.getContext (),
                                 ArticleActivity.class);
     intent.putExtra (ArticleActivity.EXTRA_ARTICLE_NUMBER,

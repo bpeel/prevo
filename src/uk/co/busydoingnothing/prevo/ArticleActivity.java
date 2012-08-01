@@ -29,7 +29,6 @@ import android.text.style.QuoteSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.text.style.SuperscriptSpan;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -153,16 +152,6 @@ public class ArticleActivity extends Activity
         if (spanType == -1)
           throwEOF ();
 
-        if (spanStart < 0 || spanLength < 0 ||
-            spanStart + spanLength > string.length ())
-          Log.wtf (TAG,
-                   "Invalid span " +
-                   spanStart +
-                   "→" +
-                   (spanLength + spanStart) +
-                   " for string of length " +
-                   string.length ());
-
         switch (spanType)
           {
           case 0:
@@ -283,8 +272,6 @@ public class ArticleActivity extends Activity
   {
     int ypos = 0;
 
-    Log.i (TAG, "Showing section " + section + " of article " + articleNumber);
-
     scrollView.delayedScrollTo (sectionHeaders.get (section));
   }
 
@@ -314,7 +301,6 @@ public class ArticleActivity extends Activity
               }
             catch (IOException e)
               {
-                Log.wtf ("Error while loading an asset", e);
               }
           }
       }

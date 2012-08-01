@@ -22,7 +22,6 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.util.Log;
 
 public class LanguageDatabaseHelper extends SQLiteOpenHelper
 {
@@ -56,8 +55,6 @@ public class LanguageDatabaseHelper extends SQLiteOpenHelper
                          int oldVersion,
                          int newVersion)
   {
-    Log.wtf (TAG, "Unexpected database upgrade requested from " + oldVersion +
-             "to " + newVersion);
   }
 
   public String[] getLanguages ()
