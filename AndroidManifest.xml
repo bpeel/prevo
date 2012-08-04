@@ -22,7 +22,7 @@
           a:versionCode="1"
           a:versionName="1.0"
           a:installLocation="auto">
-  <uses-sdk a:minSdkVersion="10" a:targetSdkVersion="14" />
+  <uses-sdk a:minSdkVersion="7" a:targetSdkVersion="14" />
 
   <application a:label="@string/app_name"
                a:icon="@drawable/icon"
