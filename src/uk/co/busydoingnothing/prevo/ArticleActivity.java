@@ -36,7 +36,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.InputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Vector;
 
 public class ArticleActivity extends Activity
@@ -49,8 +48,6 @@ public class ArticleActivity extends Activity
   public static final String TAG = "prevoarticle";
 
   private Vector<TextView> sectionHeaders;
-
-  private Charset utf8Charset = Charset.forName ("UTF-8");
 
   private DelayedScrollView scrollView;
   private int articleNumber;
@@ -139,7 +136,7 @@ public class ArticleActivity extends Activity
     readAll (in, utf8String);
 
     SpannableString string =
-      new SpannableString (new String (utf8String, utf8Charset));
+      new SpannableString (new String (utf8String));
 
     int spanLength;
 

@@ -20,7 +20,6 @@ package uk.co.busydoingnothing.prevo;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 class TrieStack
 {
@@ -80,7 +79,6 @@ class TrieStack
 
 public class Trie
 {
-  private Charset utf8Charset;
   private byte data[];
 
   private static void readAll (InputStream stream,
@@ -129,8 +127,6 @@ public class Trie
 
     /* Read the rest of the data */
     readAll (dataStream, data, 4, totalLength - 4);
-
-    utf8Charset = Charset.forName ("UTF-8");
   }
 
   /* Gets the number of bytes needed for a UTF-8 sequence which begins
@@ -178,8 +174,11 @@ public class Trie
                      SearchResult[] results)
   {
     /* Convert the string to unicode to make it easier to compare with
-     * the unicode characters in the trie */
-    byte[] prefixBytes = prefix.getBytes (utf8Charset);
+     * the unicode characters in the trie. 'getBytes' with no
+     * parameters converts the string to the default charset. This
+     * assumes the default charset is always UTF-8 which seems to be
+     * the case on Android */
+    byte[] prefixBytes = prefix.getBytes ();
 
     int trieStart = 0;
     int prefixOffset = 0;
@@ -282,8 +281,7 @@ public class Trie
         else
           stringBuf.append (new String (data,
                                         searchStart + 4,
-                                        characterLen,
-                                        utf8Charset));
+                                        characterLen));
 
         /* If this is a complete word then add it to the results */
         if (offset < 0)
@@ -308,8 +306,7 @@ public class Trie
                     int len = data[childrenStart] & 0xff;
                     word = new String (data,
                                        childrenStart + 1,
-                                       len,
-                                       utf8Charset);
+                                       len);
                     childrenStart += len + 1;
                   }
                 else
