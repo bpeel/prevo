@@ -17,7 +17,6 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -90,15 +89,10 @@ public class LanguageDatabaseHelper extends SQLiteOpenHelper
   {
     SQLiteDatabase db = getWritableDatabase ();
 
-    ContentValues cv = new ContentValues (2);
-    cv.put ("code", code);
-    cv.put ("usage_count", 0);
-
-    db.insertWithOnConflict ("language",
-                             null, /* nullColumnHack */
-                             cv,
-                             SQLiteDatabase.CONFLICT_IGNORE);
-
+    db.execSQL ("insert or ignore into `language` " +
+                "(`code`, `usage_count`) values " +
+                "(?, ?)",
+                new Object[] { code, 0 });
     db.execSQL ("update `language` set `usage_count` = `usage_count` + 1 " +
                 "where `code` = ?",
                 new Object[] { code });
