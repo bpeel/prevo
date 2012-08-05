@@ -289,6 +289,9 @@ pdb_xml_parser_new (PdbRevo *revo)
   parser->user_data = NULL;
   parser->abort_error = NULL;
   parser->revo = revo;
+  parser->start_element_handler = NULL;
+  parser->end_element_handler = NULL;
+  parser->character_data_handler = NULL;
 
   g_array_set_size (parser->stack, 1);
   entry = &g_array_index (parser->stack, PdbXmlStackEntry, 0);
