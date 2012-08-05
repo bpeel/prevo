@@ -956,6 +956,49 @@ pdb_db_flush_translations (PdbDb *db)
   return sections.head;
 }
 
+static gboolean
+pdb_db_resolve_reference (PdbDb *db,
+                          const PdbDbReference *ref,
+                          int *article_num,
+                          int *section_num)
+{
+  gboolean ret = TRUE;
+
+  switch (ref->type)
+    {
+    case PDB_DB_REFERENCE_TYPE_MARK:
+      {
+        PdbDbMark *mark =
+          g_hash_table_lookup (db->marks, ref->d.mark);
+
+        if (mark)
+          {
+            *article_num = mark->article->article_num;
+            *section_num = mark->section->section_num;
+          }
+        else
+          {
+            *article_num = 0;
+            *section_num = 0;
+            fprintf (stderr,
+                     "no mark found for reference \"%s\"\n",
+                     ref->d.mark);
+            ret = FALSE;
+          }
+      }
+      break;
+
+    case PDB_DB_REFERENCE_TYPE_DIRECT:
+      {
+        *article_num = ref->d.direct.article->article_num;
+        *section_num = ref->d.direct.section->section_num;
+      }
+      break;
+    }
+
+  return ret;
+}
+
 static void
 pdb_db_resolve_links (PdbDb *db)
 {
@@ -982,38 +1025,15 @@ pdb_db_resolve_links (PdbDb *db)
   for (l = db->links; l; l = l->next)
     {
       PdbDbLink *link = l->data;
-      PdbDbReference *ref = link->reference;
+      int article_num, section_num;
 
-      switch (ref->type)
-        {
-        case PDB_DB_REFERENCE_TYPE_MARK:
-          {
-            PdbDbMark *mark =
-              g_hash_table_lookup (db->marks, ref->d.mark);
+      pdb_db_resolve_reference (db,
+                                link->reference,
+                                &article_num,
+                                &section_num);
 
-            if (mark)
-              {
-                link->span->data1 = mark->article->article_num;
-                link->span->data2 = mark->section->section_num;
-              }
-            else
-              {
-                link->span->data1 = 0;
-                link->span->data2 = 0;
-                fprintf (stderr,
-                         "no mark found for reference \"%s\"\n",
-                         ref->d.mark);
-              }
-          }
-          break;
-
-        case PDB_DB_REFERENCE_TYPE_DIRECT:
-          {
-            link->span->data1 = ref->d.direct.article->article_num;
-            link->span->data2 = ref->d.direct.section->section_num;
-          }
-          break;
-        }
+      link->span->data1 = article_num;
+      link->span->data2 = section_num;
     }
 }
 
@@ -2053,35 +2073,12 @@ pdb_db_get_reference_cb (void *data,
                          void *user_data)
 {
   PdbDb *db = user_data;
-  PdbDbReference *entry = data;
+  PdbDbReference *ref = data;
 
-  switch (entry->type)
-    {
-    case PDB_DB_REFERENCE_TYPE_MARK:
-      {
-        PdbDbMark *mark = g_hash_table_lookup (db->marks, entry->d.mark);
-
-        if (mark)
-          {
-            *article_num = mark->article->article_num;
-            *mark_num = mark->section->section_num;
-          }
-        else
-          {
-            *article_num = 0;
-            *mark_num = 0;
-            fprintf (stderr,
-                     "no mark found for reference \"%s\"\n",
-                     entry->d.mark);
-          }
-      }
-      break;
-
-    case PDB_DB_REFERENCE_TYPE_DIRECT:
-      *article_num = entry->d.direct.article->article_num;
-      *mark_num = entry->d.direct.section->section_num;
-      break;
-    }
+  pdb_db_resolve_reference (db,
+                            ref,
+                            article_num,
+                            mark_num);
 }
 
 static void
