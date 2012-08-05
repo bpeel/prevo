@@ -33,7 +33,12 @@ prevodb_LDADD = \
 	@GLIB_LIBS@ \
 	$(NULL)
 
-noinst_PROGRAMS = dump-index dump-article test-doc
+noinst_PROGRAMS = \
+	dump-article \
+	dump-index \
+	dump-marks \
+	test-doc \
+	$(NULL)
 
 dump_index_SOURCES = \
 	dump-index.c
@@ -56,6 +61,17 @@ test_doc_SOURCES = \
 	pdb-revo.c \
 	pdb-xml.c \
 	test-doc.c \
+	$(NULL)
+
+dump_marks_SOURCES = \
+	dump-marks.c \
+	pdb-error.c \
+	pdb-revo.c \
+	pdb-xml.c \
+	$(NULL)
+
+dump_marks_LDADD = \
+	@GLIB_LIBS@ \
 	$(NULL)
 
 test_doc_LDADD = \
