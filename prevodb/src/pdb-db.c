@@ -29,6 +29,7 @@
 #include "pdb-error.h"
 #include "pdb-strcmp.h"
 #include "pdb-roman.h"
+#include "pdb-list.h"
 
 /* The article file format is a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
@@ -65,6 +66,8 @@ typedef enum
 
 typedef struct
 {
+  PdbList link;
+
   guint16 span_length;
   guint16 span_start;
   guint16 data1;
@@ -78,7 +81,7 @@ typedef struct
   char *text;
 
   /* A list of PdbDbSpans */
-  GList *spans;
+  PdbList spans;
 } PdbDbSpannableString;
 
 typedef struct
@@ -346,17 +349,19 @@ pdb_db_span_free (PdbDbSpan *span)
 }
 
 static void
-pdb_db_free_span_list (GList *spans)
+pdb_db_free_span_list (PdbList *spans)
 {
-  g_list_foreach (spans, (GFunc) pdb_db_span_free, NULL);
-  g_list_free (spans);
+  PdbDbSpan *span, *tmp;
+
+  pdb_list_for_each_safe (span, tmp, spans, link)
+    pdb_db_span_free (span);
 }
 
 static void
 pdb_db_destroy_spannable_string (PdbDbSpannableString *string)
 {
   g_free (string->text);
-  pdb_db_free_span_list (string->spans);
+  pdb_db_free_span_list (&string->spans);
 }
 
 static void
@@ -446,7 +451,7 @@ pdb_db_add_mark (PdbDb *db,
 typedef struct
 {
   GString *buf;
-  GQueue spans;
+  PdbList spans;
 } PdbDbTranslationData;
 
 static void
@@ -457,7 +462,7 @@ pdb_db_free_translation_data_cb (void *user_data)
   if (data->buf)
     g_string_free (data->buf, TRUE);
 
-  pdb_db_free_span_list (data->spans.head);
+  pdb_db_free_span_list (&data->spans);
 
   g_slice_free (PdbDbTranslationData, data);
 }
@@ -488,7 +493,7 @@ pdb_db_get_trd_link (PdbDb *db,
                      PdbDocElementNode *trd_elem,
                      const PdbDbReference *reference,
                      GString *buf,
-                     GQueue *spans,
+                     PdbList *spans,
                      GError **error)
 {
   PdbDocElementNode *parent, *kap;
@@ -595,7 +600,8 @@ pdb_db_get_trd_link (PdbDb *db,
   span->span_length = span_end - span_start;
   span->span_start = span_start;
   span->type = PDB_DB_SPAN_REFERENCE;
-  g_queue_push_tail (spans, span);
+  /* Add this span to the end of the list */
+  pdb_list_insert (spans->prev, &span->link);
 
   link = g_slice_new (PdbDbLink);
   link->span = span;
@@ -775,7 +781,7 @@ pdb_db_handle_translation (PdbDb *db,
     {
       data = g_slice_new (PdbDbTranslationData);
       data->buf = g_string_new (NULL);
-      g_queue_init (&data->spans);
+      pdb_list_init (&data->spans);
       g_hash_table_insert (db->translations,
                            g_strdup (lang_code),
                            data);
@@ -937,14 +943,15 @@ pdb_db_flush_translations (PdbDb *db)
 
       section->title.length = strlen (lang_name);
       section->title.text = g_strdup (lang_name);
-      section->title.spans = NULL;
+      pdb_list_init (&section->title.spans);
 
       section->text.length = data->buf->len;
       section->text.text = g_string_free (data->buf, FALSE);
-      section->text.spans = data->spans.head;
+      pdb_list_init (&section->text.spans);
+      pdb_list_insert_list (section->text.spans.prev, &data->spans);
 
       data->buf = NULL;
-      g_queue_init (&data->spans);
+      pdb_list_init (&data->spans);
 
       g_queue_push_tail (&sections, section);
     }
@@ -1061,7 +1068,7 @@ typedef struct
 {
   GArray *stack;
   GString *buf;
-  GQueue spans;
+  PdbList spans;
   gboolean paragraph_queued;
 } PdbDbParseState;
 
@@ -1147,7 +1154,8 @@ pdb_db_start_span (PdbDbParseState *state,
     pdb_db_get_utf16_length (state->buf->str);
   span->type = type;
 
-  g_queue_push_tail (&state->spans, span);
+  /* Add the span to the end of the list */
+  pdb_list_insert (state->spans.prev, &span->link);
   /* Push the span onto the state.stack so that we can
    * fill in the span length once all of the child
    * nodes have been processed */
@@ -1189,7 +1197,7 @@ pdb_db_handle_rim (PdbDb *db,
 
   bold_span->span_length = (pdb_db_get_utf16_length (state->buf->str) -
                             bold_span->span_start);
-  g_queue_push_tail (&state->spans, bold_span);
+  pdb_list_insert (state->spans.prev, &bold_span->link);
 
   return TRUE;
 }
@@ -1544,7 +1552,7 @@ pdb_db_parse_spannable_string (PdbDb *db,
   state.buf = g_string_new (NULL);
   state.paragraph_queued = FALSE;
 
-  g_queue_init (&state.spans);
+  pdb_list_init (&state.spans);
 
   pdb_db_parse_push_node (&state, root_element->node.first_child);
 
@@ -1581,7 +1589,8 @@ pdb_db_parse_spannable_string (PdbDb *db,
 
   string->length = state.buf->len;
   string->text = g_string_free (state.buf, FALSE);
-  string->spans = state.spans.head;
+  pdb_list_init (&string->spans);
+  pdb_list_insert_list (&string->spans, &state.spans);
 
   g_array_free (state.stack, TRUE);
 
@@ -1590,7 +1599,7 @@ pdb_db_parse_spannable_string (PdbDb *db,
  error:
   g_array_free (state.stack, TRUE);
   g_string_free (state.buf, TRUE);
-  pdb_db_free_span_list (state.spans.head);
+  pdb_db_free_span_list (&state.spans);
 
   return FALSE;
 }
@@ -1750,7 +1759,7 @@ pdb_db_parse_subart (PdbDb *db,
   g_string_append (buf, ".");
   section->title.length = buf->len;
   section->title.text = g_string_free (buf, FALSE);
-  section->title.spans = NULL;
+  pdb_list_init (&section->title.spans);
 
   ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
   ref.d.direct.article = article;
@@ -1791,7 +1800,7 @@ pdb_db_parse_subart (PdbDb *db,
         {
           section->text.length = 0;
           section->text.text = g_strdup ("");
-          section->text.spans = NULL;
+          pdb_list_init (&section->text.spans);
         }
 
       g_queue_push_tail (sections, section);
@@ -2252,15 +2261,13 @@ pdb_db_write_string (PdbDb *pdb,
                      GError **error)
 {
   guint16 len = GUINT16_TO_LE (string->length);
-  GList *l;
+  PdbDbSpan *span;
 
   fwrite (&len, sizeof (len), 1, out);
   fwrite (string->text, 1, len, out);
 
-  for (l = string->spans; l; l = l->next)
+  pdb_list_for_each (span, &string->spans, link)
     {
-      PdbDbSpan *span = l->data;
-
       /* Ignore empty spans */
       if (span->span_length > 0)
         {
