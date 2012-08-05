@@ -1034,13 +1034,22 @@ pdb_db_resolve_links (PdbDb *db)
       PdbDbLink *link = l->data;
       int article_num, section_num;
 
-      pdb_db_resolve_reference (db,
-                                link->reference,
-                                &article_num,
-                                &section_num);
-
-      link->span->data1 = article_num;
-      link->span->data2 = section_num;
+      if (pdb_db_resolve_reference (db,
+                                    link->reference,
+                                    &article_num,
+                                    &section_num))
+        {
+          link->span->data1 = article_num;
+          link->span->data2 = section_num;
+        }
+      else
+        {
+          /* Remove the span if we couldn't resolve the reference so
+           * that it won't leave a link pointing to the wrong
+           * article */
+          pdb_list_remove (&link->span->link);
+          pdb_db_span_free (link->span);
+        }
     }
 }
 
