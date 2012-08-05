@@ -25,7 +25,7 @@
   <uses-sdk a:minSdkVersion="7" a:targetSdkVersion="14" />
 
   <application a:label="@string/app_name"
-               a:icon="@drawable/icon"
+               a:icon="@drawable/ic_launcher"
                a:hardwareAccelerated="true"
                a:debuggable="true">
     <activity a:name="LanguagesActivity"
