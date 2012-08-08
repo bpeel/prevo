@@ -978,6 +978,31 @@ pdb_db_resolve_reference (PdbDb *db,
         PdbDbMark *mark =
           g_hash_table_lookup (db->marks, ref->d.mark);
 
+        if (mark == NULL)
+          {
+            /* Try the mark again with increasingly less precision
+             * until will find one that matches so that we can at
+             * least point to the right article */
+            char *mark_copy = g_strdup (ref->d.mark);
+            char *dot;
+
+            while ((dot = strrchr (mark_copy, '.')))
+              {
+                *dot = '\0';
+
+                if ((mark = g_hash_table_lookup (db->marks, mark_copy)))
+                  {
+                    fprintf (stderr,
+                             "using less precise mark \"%s\" for \"%s\"\n",
+                             mark_copy,
+                             ref->d.mark);
+                    break;
+                  }
+              }
+
+            g_free (mark_copy);
+          }
+
         if (mark)
           {
             *article_num = mark->article->article_num;
