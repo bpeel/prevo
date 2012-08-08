@@ -127,17 +127,43 @@ dump_start_element_handler (void *user_data,
   for (att = atts; att[0]; att += 2)
     {
       if (!strcmp (att[0], "cel") &&
-          !g_hash_table_lookup_extended (data->hash,
-                                         att[1],
-                                         NULL,
-                                         NULL))
+          !g_hash_table_contains (data->hash,
+                                  att[1]))
         {
+          char *mark_copy;
+          char *dot;
+
           fprintf (stderr,
-                   "%s:%i:%i: missing reference \"%s\"\n",
+                   "%s:%i:%i: missing reference \"%s\"",
                    pdb_xml_get_current_filename (data->parser),
                    pdb_xml_get_current_line_number (data->parser),
                    pdb_xml_get_current_column_number (data->parser),
                    att[1]);
+
+          /* Try the mark again with increasingly less precision
+           * until will find one that matches */
+
+          mark_copy = g_strdup (att[1]);
+
+          while ((dot = strrchr (mark_copy, '.')))
+            {
+              *dot = '\0';
+
+              if (g_hash_table_contains (data->hash, mark_copy))
+                {
+                  fprintf (stderr,
+                           ", best match \"%s\"",
+                           mark_copy);
+                  goto found_match;
+                }
+            }
+
+          fprintf (stderr, ", ** no best match **");
+
+        found_match:
+          g_free (mark_copy);
+
+          fputc ('\n', stdout);
         }
     }
 }
