@@ -34,6 +34,7 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -343,5 +344,18 @@ public class ArticleActivity extends Activity
   protected Dialog onCreateDialog (int id)
   {
     return MenuHelper.onCreateDialog (this, id);
+  }
+
+  @Override
+  public boolean onKeyDown (int keyCode,
+                            KeyEvent event)
+  {
+    if (keyCode == KeyEvent.KEYCODE_SEARCH)
+      {
+        MenuHelper.goSearch (this);
+        return true;
+      }
+
+    return super.onKeyDown (keyCode, event);
   }
 }
