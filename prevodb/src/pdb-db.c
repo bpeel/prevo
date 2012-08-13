@@ -174,10 +174,10 @@ struct _PdbDb
 typedef struct
 {
   const char *name;
-  const char *symbol;
-} PdbDbRefType;
+  const char *replacement;
+} PdbDbReplacement;
 
-static const PdbDbRefType
+static const PdbDbReplacement
 pdb_db_ref_types[] =
   {
     { "vid", "→" },
@@ -189,8 +189,22 @@ pdb_db_ref_types[] =
     { "sub", "↘" },
     { "prt", "↘" },
     { "malprt", "↗" },
-    { "lst", NULL /* ? */ },
+    /* { "lst", "??" }, */
     { "ekz", "●" }
+  };
+
+static const PdbDbReplacement
+pdb_db_styles[] =
+  {
+    { "KOMUNE", "(komune) " },
+    { "FIG", "(figure) " },
+    { "ARK", "(arkaismo) " },
+    { "EVI", "(evitinde) " },
+    { "FRAZ", "(frazaĵo) " },
+    { "VULG", "(vulgare) " },
+    { "RAR", "(malofte) " },
+    { "POE", "(poezie) " },
+    { "NEO", "(neologismo) " }
   };
 
 static void
@@ -1104,6 +1118,7 @@ typedef struct
   GString *buf;
   PdbList spans;
   gboolean paragraph_queued;
+  gboolean skip_children;
 } PdbDbParseState;
 
 static PdbDbParseStackEntry *
@@ -1236,6 +1251,47 @@ pdb_db_handle_rim (PdbDb *db,
   return TRUE;
 }
 
+static gboolean
+pdb_db_add_replacement (PdbDbParseState *state,
+                        const char *name,
+                        const PdbDbReplacement *replacements,
+                        int n_replacements)
+{
+  int i;
+
+  for (i = 0; i < n_replacements; i++)
+    {
+      const PdbDbReplacement *replacement = replacements + i;
+
+      if (!strcmp (name, replacement->name))
+        {
+          pdb_db_start_text (state);
+          g_string_append (state->buf, replacement->replacement);
+
+          return TRUE;
+        }
+    }
+
+  return FALSE;
+}
+
+static gboolean
+pdb_db_add_replacement_contents (PdbDbParseState *state,
+                                 PdbDocElementNode *element,
+                                 const PdbDbReplacement *replacements,
+                                 int n_replacements)
+{
+  GString *buf = g_string_new (NULL);
+  gboolean ret;
+
+  pdb_doc_append_element_text (element, buf);
+  pdb_db_trim_buf (buf);
+  ret = pdb_db_add_replacement (state, buf->str, replacements, n_replacements);
+  g_string_free (buf, TRUE);
+
+  return ret;
+}
+
 static void
 pdb_db_handle_reference_type (PdbDbParseState *state,
                               PdbDocElementNode *element)
@@ -1258,23 +1314,10 @@ pdb_db_handle_reference_type (PdbDbParseState *state,
   for (att = element->atts; att[0]; att += 2)
     if (!strcmp (att[0], "tip"))
       {
-        int i;
-
-        for (i = 0; i < G_N_ELEMENTS (pdb_db_ref_types); i++)
-          {
-            const PdbDbRefType *type = pdb_db_ref_types + i;
-
-            if (!strcmp (att[1], type->name))
-              {
-                if (type->symbol)
-                  {
-                    pdb_db_start_text (state);
-                    g_string_append (state->buf, type->symbol);
-                  }
-
-                break;
-              }
-          }
+        pdb_db_add_replacement (state,
+                                att[1],
+                                pdb_db_ref_types,
+                                G_N_ELEMENTS (pdb_db_ref_types));
 
         break;
       }
@@ -1395,6 +1438,33 @@ pdb_db_handle_subsnc (PdbDb *db,
   return TRUE;
 }
 
+static gboolean
+pdb_db_handle_uzo (PdbDb *db,
+                   PdbDbParseState *state,
+                   PdbDocElementNode *element,
+                   PdbDbSpan *span,
+                   GError **error)
+{
+  char **att;
+
+  for (att = element->atts; att[0]; att += 2)
+    {
+      if (!strcmp (att[0], "tip"))
+        {
+          if (!strcmp (att[1], "stl"))
+            state->skip_children =
+              pdb_db_add_replacement_contents (state,
+                                               element,
+                                               pdb_db_styles,
+                                               G_N_ELEMENTS (pdb_db_styles));
+
+          break;
+        }
+    }
+
+  return TRUE;
+}
+
 static PdbDbElementSpan
 pdb_db_element_spans[] =
   {
@@ -1436,6 +1506,7 @@ pdb_db_element_spans[] =
     },
     { .name = "em", .type = PDB_DB_SPAN_BOLD, },
     { .name = "aut", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_aut },
+    { .name = "uzo", .type = PDB_DB_SPAN_NONE, .handler = pdb_db_handle_uzo }
   };
 
 static gboolean
@@ -1502,6 +1573,8 @@ pdb_db_parse_node (PdbDb *db,
           {
             int i;
 
+            state->skip_children = FALSE;
+
             for (i = 0; i < G_N_ELEMENTS (pdb_db_element_spans); i++)
               {
                 const PdbDbElementSpan *elem_span =
@@ -1539,8 +1612,9 @@ pdb_db_parse_node (PdbDb *db,
                   }
               }
 
-            pdb_db_parse_push_node (state,
-                                    element->node.first_child);
+            if (!state->skip_children)
+              pdb_db_parse_push_node (state,
+                                      element->node.first_child);
           }
       }
       break;
