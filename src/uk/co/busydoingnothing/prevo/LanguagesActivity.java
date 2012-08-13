@@ -17,17 +17,13 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.AlertDialog;
-import android.app.Dialog;
 import android.app.ListActivity;
-import android.content.DialogInterface;
+import android.app.Dialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.method.LinkMovementMethod;
-import android.text.SpannableString;
-import android.text.Spanned;
-import android.text.style.URLSpan;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -41,13 +37,6 @@ public class LanguagesActivity extends ListActivity
 {
   private LanguageDatabaseHelper dbHelper;
   private LanguagesAdapter adapter;
-
-  private static final int DIALOG_ABOUT = 0;
-
-  private static final String LICENSE_URL =
-    "http://www.gnu.org/licenses/gpl-2.0-standalone.html";
-  private static final String RETA_VORTARO_URL =
-    "http://purl.org/net/voko/revo/";
 
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -86,6 +75,13 @@ public class LanguagesActivity extends ListActivity
 
               dbHelper.useLanguage (lang.getCode ());
 
+              SharedPreferences prefs =
+                getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                                      MODE_PRIVATE);
+              SharedPreferences.Editor editor = prefs.edit ();
+              editor.putString (MenuHelper.PREF_LAST_LANGUAGE, lang.getCode ());
+              editor.commit ();
+
               startActivity (intent);
             }
         }
@@ -101,91 +97,27 @@ public class LanguagesActivity extends ListActivity
   }
 
   @Override
-  public boolean onCreateOptionsMenu(Menu menu)
+  public boolean onCreateOptionsMenu (Menu menu)
   {
     MenuInflater inflater = getMenuInflater ();
+
     inflater.inflate (R.menu.main_menu, menu);
 
-    return super.onCreateOptionsMenu (menu);
+    return true;
   }
 
   @Override
   public boolean onOptionsItemSelected (MenuItem item)
   {
-    switch (item.getItemId ())
-      {
-      case R.id.menu_about:
-        showDialog (DIALOG_ABOUT);
-        break;
-      }
+    if (MenuHelper.onOptionsItemSelected (this, item))
+      return true;
 
     return super.onOptionsItemSelected (item);
-  }
-
-  private void linkifyAboutMessage (SpannableString string)
-  {
-    int pos;
-
-    if ((pos = string.toString ().indexOf ("Click here for")) != -1)
-      {
-        URLSpan span = new URLSpan (LICENSE_URL);
-        string.setSpan (span, pos + 6, pos + 10, 0 /* flags */);
-      }
-
-    if ((pos = string.toString ().indexOf ("Reta Vortaro")) != -1)
-      {
-        URLSpan span = new URLSpan (RETA_VORTARO_URL);
-        string.setSpan (span, pos, pos + 12, 0 /* flags */);
-      }
   }
 
   @Override
   protected Dialog onCreateDialog (int id)
   {
-    Dialog dialog;
-    Resources res = getResources ();
-
-    switch (id)
-      {
-      case DIALOG_ABOUT:
-        {
-          AlertDialog.Builder builder = new AlertDialog.Builder (this);
-          CharSequence message = res.getText (R.string.about_message);
-
-          if (message instanceof Spanned)
-            {
-              message = new SpannableString (message);
-              linkifyAboutMessage ((SpannableString) message);
-            }
-
-          LayoutInflater layoutInflater = getLayoutInflater ();
-          TextView tv =
-            (TextView) layoutInflater.inflate (R.layout.about_view,
-                                               null);
-          tv.setText (message);
-          tv.setMovementMethod (LinkMovementMethod.getInstance ());
-
-          builder
-            .setView (tv)
-            .setCancelable (true)
-            .setNegativeButton (R.string.close,
-                                new DialogInterface.OnClickListener ()
-                                {
-                                  @Override
-                                  public void onClick (DialogInterface dialog,
-                                                       int whichButton)
-                                  {
-                                  }
-                                });
-          dialog = builder.create ();
-        }
-        break;
-
-      default:
-        dialog = null;
-        break;
-      }
-
-    return dialog;
+    return MenuHelper.onCreateDialog (this, id);
   }
 }

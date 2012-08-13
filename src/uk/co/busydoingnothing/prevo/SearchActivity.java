@@ -17,12 +17,16 @@
 
 package uk.co.busydoingnothing.prevo;
 
+import android.app.Dialog;
 import android.app.ListActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.inputmethod.InputMethodManager;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -110,6 +114,33 @@ public class SearchActivity extends ListActivity
       imm.showSoftInput (tv,
                          0, /* flags */
                          null /* resultReceiver */);
+  }
+
+  @Override
+  public boolean onCreateOptionsMenu (Menu menu)
+  {
+    MenuInflater inflater = getMenuInflater ();
+
+    inflater.inflate (R.menu.other_menu, menu);
+
+    menu.removeItem (R.id.menu_search);
+
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected (MenuItem item)
+  {
+    if (MenuHelper.onOptionsItemSelected (this, item))
+      return true;
+
+    return super.onOptionsItemSelected (item);
+  }
+
+  @Override
+  protected Dialog onCreateDialog (int id)
+  {
+    return MenuHelper.onCreateDialog (this, id);
   }
 
   @Override

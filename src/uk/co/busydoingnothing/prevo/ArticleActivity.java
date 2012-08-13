@@ -18,9 +18,9 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.AssetManager;
-import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
@@ -31,6 +31,9 @@ import android.text.style.StyleSpan;
 import android.text.style.SuperscriptSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -315,5 +318,30 @@ public class ArticleActivity extends Activity
               }
           }
       }
+  }
+
+  @Override
+  public boolean onCreateOptionsMenu (Menu menu)
+  {
+    MenuInflater inflater = getMenuInflater ();
+
+    inflater.inflate (R.menu.other_menu, menu);
+
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected (MenuItem item)
+  {
+    if (MenuHelper.onOptionsItemSelected (this, item))
+      return true;
+
+    return super.onOptionsItemSelected (item);
+  }
+
+  @Override
+  protected Dialog onCreateDialog (int id)
+  {
+    return MenuHelper.onCreateDialog (this, id);
   }
 }

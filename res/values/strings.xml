@@ -23,12 +23,13 @@
   <string name="search">Serĉu</string>
   <string name="no_results">Neniuj vortoj troviĝis</string>
   <string name="type_to_filter">Tajpu ion por serĉi</string>
-  <string name="menu_home">Hejmo</string>
+  <string name="menu_choose_language">Elektu lingvon</string>
+  <string name="menu_search">Serĉu</string>
   <string name="menu_about">Pri</string>
   <string name="close">Fermu</string>
   <string name="about_message">
 <b>PReVo 0.1</b>\n
-\nCopyright ⓒ 2012 Neil Roberts\n
+\nCopyright © 2012 Neil Roberts\n
 \nLa datumo por la vortaro venas de Reta Vortaro.\n
 \nThis program comes with ABSOLUTELY NO WARRANTY. This is free
 software and you are welcome to redistribute it under certain
