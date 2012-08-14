@@ -133,7 +133,7 @@ dump_start_element_handler (void *user_data,
           char *mark_copy;
           char *dot;
 
-          fprintf (stderr,
+          fprintf (stdout,
                    "%s:%i:%i: missing reference \"%s\"",
                    pdb_xml_get_current_filename (data->parser),
                    pdb_xml_get_current_line_number (data->parser),
@@ -151,14 +151,14 @@ dump_start_element_handler (void *user_data,
 
               if (g_hash_table_contains (data->hash, mark_copy))
                 {
-                  fprintf (stderr,
+                  fprintf (stdout,
                            ", best match \"%s\"",
                            mark_copy);
                   goto found_match;
                 }
             }
 
-          fprintf (stderr, ", ** no best match **");
+          fprintf (stdout, ", ** no best match **");
 
         found_match:
           g_free (mark_copy);
