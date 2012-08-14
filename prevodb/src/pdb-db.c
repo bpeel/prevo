@@ -2101,6 +2101,11 @@ pdb_db_parse_article (PdbDb *db,
           ref.type = PDB_DB_REFERENCE_TYPE_DIRECT;
           ref.d.direct.article = article;
 
+          if (sections.head == NULL)
+            fprintf (stderr,
+                     "no content found for article “%s”\n",
+                     article->title.text);
+
           if (sections.head == NULL ||
               (ref.d.direct.section = sections.head->data,
                pdb_db_find_translations (db,
@@ -2290,11 +2295,15 @@ pdb_db_new (PdbRevo *revo,
 
               if (parse_result)
                 {
-                  /* Some articles directly reference the filename
-                   * instead of a real mark so we need to add a mark
-                   * for each file */
-                  if (db->articles->len > old_len)
+                  if (db->articles->len <= old_len)
+                    fprintf (stderr,
+                             "no articles found in %s\n",
+                             file);
+                  else
                     {
+                      /* Some articles directly reference the filename
+                       * instead of a real mark so we need to add a mark
+                       * for each file */
                       PdbDbArticle *article =
                         g_ptr_array_index (db->articles, db->articles->len - 1);
 
