@@ -28,7 +28,7 @@
   <string name="menu_about">Pri</string>
   <string name="close">Fermu</string>
   <string name="about_message">
-<b>PReVo 0.1</b>\n
+<b>PReVo @VERSION@</b>\n
 \nCopyright © 2012 Neil Roberts\n
 \nLa datumo por la vortaro venas de Reta Vortaro.\n
 \nThis program comes with ABSOLUTELY NO WARRANTY. This is free

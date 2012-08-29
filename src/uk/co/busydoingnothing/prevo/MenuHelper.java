@@ -20,12 +20,15 @@ package uk.co.busydoingnothing.prevo;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.text.method.LinkMovementMethod;
-import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.URLSpan;
 import android.view.LayoutInflater;
@@ -48,9 +51,30 @@ public class MenuHelper
 
   private static final int DIALOG_ABOUT = 0;
 
-  private static void linkifyAboutMessage (SpannableString string)
+  private static void linkifyAboutMessage (Context context,
+                                           SpannableStringBuilder string)
   {
     int pos;
+
+    if ((pos = string.toString ().indexOf ("@VERSION@")) != -1)
+      {
+        String packageVersion;
+
+        try
+          {
+            PackageManager manager = context.getPackageManager ();
+            String packageName = context.getPackageName ();
+            PackageInfo packageInfo = manager.getPackageInfo (packageName, 0);
+
+            packageVersion = packageInfo.versionName;
+          }
+        catch (PackageManager.NameNotFoundException e)
+          {
+            packageVersion = "?";
+          }
+
+        string.replace (pos, pos + 9, packageVersion);
+      }
 
     if ((pos = string.toString ().indexOf ("Click here for")) != -1)
       {
@@ -76,13 +100,10 @@ public class MenuHelper
       case DIALOG_ABOUT:
         {
           AlertDialog.Builder builder = new AlertDialog.Builder (activity);
-          CharSequence message = res.getText (R.string.about_message);
+          SpannableStringBuilder message =
+            new SpannableStringBuilder (res.getText (R.string.about_message));
 
-          if (message instanceof Spanned)
-            {
-              message = new SpannableString (message);
-              linkifyAboutMessage ((SpannableString) message);
-            }
+          linkifyAboutMessage (activity, message);
 
           LayoutInflater layoutInflater = activity.getLayoutInflater ();
           TextView tv =
