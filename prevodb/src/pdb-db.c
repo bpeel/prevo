@@ -68,6 +68,9 @@ typedef struct
 {
   PdbList link;
 
+  /* The span length and span start count the number of bytes. Once
+   * stored to the file, this will be converted to a number of 16-bit
+   * units as if the string was stored in UTF-16. */
   guint16 span_length;
   guint16 span_start;
   guint16 data1;
@@ -396,28 +399,6 @@ pdb_db_free_section_list (GList *sections)
 }
 
 static int
-pdb_db_get_utf16_length (const char *buf)
-{
-  int length = 0;
-
-  /* Calculates the length that the string would have if it was
-   * encoded in UTF-16 */
-  for (; *buf; buf = g_utf8_next_char (buf))
-    {
-      gunichar ch = g_utf8_get_char (buf);
-
-      length++;
-      /* If the character is outside the BMP then it
-       * will need an extra 16 bit number to encode
-       * it */
-      if (ch >= 0x10000)
-        length++;
-    }
-
-  return length;
-}
-
-static int
 pdb_db_get_element_num (PdbDocElementNode *element)
 {
   PdbDocNode *n;
@@ -563,7 +544,7 @@ pdb_db_get_trd_link (PdbDb *db,
       return FALSE;
     }
 
-  span_start = pdb_db_get_utf16_length (buf->str);
+  span_start = buf->len;
 
   for (n = kap->node.first_child; n; n = n->next)
     {
@@ -608,7 +589,7 @@ pdb_db_get_trd_link (PdbDb *db,
         g_string_append_printf (buf, ".%c", subsence_num + 'a');
     }
 
-  span_end = pdb_db_get_utf16_length (buf->str);
+  span_end = buf->len;
 
   span = g_slice_new0 (PdbDbSpan);
   span->span_length = span_end - span_start;
@@ -1199,8 +1180,7 @@ pdb_db_start_span (PdbDbParseState *state,
   PdbDbSpan *span = g_slice_new0 (PdbDbSpan);
   PdbDbParseStackEntry *entry;
 
-  span->span_start =
-    pdb_db_get_utf16_length (state->buf->str);
+  span->span_start = state->buf->len;
   span->type = type;
 
   /* Add the span to the end of the list */
@@ -1240,11 +1220,11 @@ pdb_db_handle_rim (PdbDb *db,
   pdb_db_start_text (state);
 
   bold_span->type = PDB_DB_SPAN_BOLD;
-  bold_span->span_start = pdb_db_get_utf16_length (state->buf->str);
+  bold_span->span_start = state->buf->len;
 
   g_string_append (state->buf, "Rim. ");
 
-  bold_span->span_length = (pdb_db_get_utf16_length (state->buf->str) -
+  bold_span->span_length = (state->buf->len -
                             bold_span->span_start);
   pdb_list_insert (state->spans.prev, &bold_span->link);
 
@@ -1675,8 +1655,7 @@ pdb_db_parse_spannable_string (PdbDb *db,
         {
         case PDB_DB_STACK_CLOSE_SPAN:
           this_entry.d.span->span_length =
-            pdb_db_get_utf16_length (state.buf->str) -
-            this_entry.d.span->span_start;
+            state.buf->len - this_entry.d.span->span_start;
           break;
 
         case PDB_DB_STACK_ADD_PARAGRAPH:
@@ -2371,6 +2350,30 @@ pdb_db_free (PdbDb *db)
   g_slice_free (PdbDb, db);
 }
 
+static int
+pdb_db_get_utf16_length (const char *buf,
+                         int byte_length)
+{
+  const char *p;
+  int length = 0;
+
+  /* Calculates the length that the string would have if it was
+   * encoded in UTF-16 */
+  for (p = buf; p - buf < byte_length; p = g_utf8_next_char (p))
+    {
+      gunichar ch = g_utf8_get_char (p);
+
+      length++;
+      /* If the character is outside the BMP then it
+       * will need an extra 16 bit number to encode
+       * it */
+      if (ch >= 0x10000)
+        length++;
+    }
+
+  return length;
+}
+
 static gboolean
 pdb_db_write_string (PdbDb *pdb,
                      const PdbDbSpannableString *string,
@@ -2388,8 +2391,13 @@ pdb_db_write_string (PdbDb *pdb,
       /* Ignore empty spans */
       if (span->span_length > 0)
         {
-          guint16 v[4] = { GUINT16_TO_LE (span->span_length),
-                           GUINT16_TO_LE (span->span_start),
+          guint16 span_length =
+            pdb_db_get_utf16_length (string->text + span->span_start,
+                                     span->span_length);
+          guint16 span_start =
+            pdb_db_get_utf16_length (string->text, span->span_start);
+          guint16 v[4] = { GUINT16_TO_LE (span_length),
+                           GUINT16_TO_LE (span_start),
                            GUINT16_TO_LE (span->data1),
                            GUINT16_TO_LE (span->data2) };
           fwrite (v, sizeof (len), 4, out);
