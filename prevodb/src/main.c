@@ -22,6 +22,62 @@
 #include "pdb-revo.h"
 #include "pdb-db.h"
 
+static const char *option_in_file = NULL;
+static const char *option_out_file = NULL;
+
+static GOptionEntry
+options[] =
+  {
+    {
+      "in", 'i', 0, G_OPTION_ARG_STRING, &option_in_file,
+      "The zip file or directory containing the ReVo XML files", NULL
+    },
+    {
+      "out", 'o', 0, G_OPTION_ARG_STRING, &option_out_file,
+      "Location for the output of the database", NULL
+    },
+    { NULL, 0, 0, 0, NULL, NULL, NULL }
+  };
+
+static gboolean
+process_arguments (int *argc, char ***argv,
+                   GError **error)
+{
+  GOptionContext *context;
+  gboolean ret;
+  GOptionGroup *group;
+
+  group = g_option_group_new (NULL, /* name */
+                              NULL, /* description */
+                              NULL, /* help_description */
+                              NULL, /* user_data */
+                              NULL /* destroy notify */);
+  g_option_group_add_entries (group, options);
+  context = g_option_context_new ("- Creates a compact database from the "
+                                  "ReVo XML files");
+  g_option_context_set_main_group (context, group);
+  ret = g_option_context_parse (context, argc, argv, error);
+  g_option_context_free (context);
+
+  if (ret)
+    {
+      if (*argc > 1)
+        {
+          g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_UNKNOWN_OPTION,
+                       "Unknown option '%s'", (* argv)[1]);
+          ret = FALSE;
+        }
+      else if (option_in_file == NULL || option_out_file == NULL)
+        {
+          g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE,
+                       "The -i and -o options are required. See --help");
+          ret = FALSE;
+        }
+    }
+
+  return ret;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -29,14 +85,14 @@ main (int argc, char **argv)
   PdbRevo *revo;
   int ret = 0;
 
-  if (argc != 3)
+  if (!process_arguments (&argc, &argv, &error))
     {
-      fprintf (stderr, "usage: prevodb <revo zip file> <out directory>\n");
+      fprintf (stderr, "%s\n", error->message);
       ret = 1;
     }
   else
     {
-      revo = pdb_revo_new (argv[1], &error);
+      revo = pdb_revo_new (option_in_file, &error);
 
       if (revo == NULL)
         {
@@ -56,7 +112,7 @@ main (int argc, char **argv)
             }
           else
             {
-              if (!pdb_db_save (db, argv[2], &error))
+              if (!pdb_db_save (db, option_out_file, &error))
                 {
                   fprintf (stderr, "%s\n", error->message);
                   g_clear_error (&error);
