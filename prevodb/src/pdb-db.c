@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <glib/gstdio.h>
 
 #include "pdb-db.h"
 #include "pdb-lang.h"
@@ -30,6 +31,7 @@
 #include "pdb-strcmp.h"
 #include "pdb-roman.h"
 #include "pdb-list.h"
+#include "pdb-file.h"
 
 /* The article file format is a list of strings. Each string comprises of:
  * • A two byte little endian number for the length of the string data
@@ -53,6 +55,32 @@
  * The length and string offset are counted in 16-bit units as if the
  * string was encoded in UTF-16.
  */
+
+/* If a single output file is selected, the format is as follows:
+ * • Four bytes for the magic string ‘PRDB’
+ * • Four bytes in little-endian format representing the number of articles.
+ * • Four bytes in little-endian for each article representing the
+ *   offset in the file to the data for that article.
+ * • Four bytes in little-endian representing the number of languages.
+ * • A table of offsets to the indices for each language consisting of:
+ *   • Four bytes reserved for a null terminated string representing the
+ *     language code
+ *   • Four bytes in little-endian for the offset to the index for that
+ *     language.
+ *   The entry for each language is a fixed length which means the table can
+ *   be binary chopped.
+ * • The data for each language. This consists of:
+ *   • A null-terminated string in UTF-8 representing the full language name.
+ *   • The data for the index as described in pdb-trie.c
+ * • The data for each article in the format described above except for the
+ *   following:
+ *   • Before the title string there is a 4-byte little endian number
+ *     representing the size of the article data in bytes
+ *   • The span offsets and lengths are stored as byte counts rather than
+ *     as counts of UTF-16 code points.
+ */
+
+static const char pdb_db_magic[4] = "PRDB";
 
 typedef enum
 {
@@ -2377,14 +2405,15 @@ pdb_db_get_utf16_length (const char *buf,
 static gboolean
 pdb_db_write_string (PdbDb *pdb,
                      const PdbDbSpannableString *string,
-                     FILE *out,
+                     gboolean single,
+                     PdbFile *out,
                      GError **error)
 {
-  guint16 len = GUINT16_TO_LE (string->length);
   PdbDbSpan *span;
 
-  fwrite (&len, sizeof (len), 1, out);
-  fwrite (string->text, 1, len, out);
+  if (!pdb_file_write_16 (out, string->length, error) ||
+      !pdb_file_write (out, string->text, string->length, error))
+    return FALSE;
 
   pdb_list_for_each (span, &string->spans, link)
     {
@@ -2392,42 +2421,46 @@ pdb_db_write_string (PdbDb *pdb,
       if (span->span_length > 0)
         {
           guint16 span_length =
+            single ?
+            span->span_length :
             pdb_db_get_utf16_length (string->text + span->span_start,
                                      span->span_length);
           guint16 span_start =
+            single ?
+            span->span_start :
             pdb_db_get_utf16_length (string->text, span->span_start);
           guint16 v[4] = { GUINT16_TO_LE (span_length),
                            GUINT16_TO_LE (span_start),
                            GUINT16_TO_LE (span->data1),
                            GUINT16_TO_LE (span->data2) };
-          fwrite (v, sizeof (len), 4, out);
-          fputc (span->type, out);
+
+          if (!pdb_file_write (out, v, sizeof (v), error) ||
+              !pdb_file_write_8 (out, span->type, error))
+            return FALSE;
         }
     }
 
-  len = GUINT16_TO_LE (0);
-  fwrite (&len, sizeof (len), 1, out);
-
-  return TRUE;
+  return pdb_file_write_16 (out, 0, error);
 }
 
 static gboolean
 pdb_db_save_article (PdbDb *db,
                      PdbDbArticle *article,
-                     FILE *out,
+                     gboolean single,
+                     PdbFile *out,
                      GError **error)
 {
   GList *sl;
 
-  if (!pdb_db_write_string (db, &article->title, out, error))
+  if (!pdb_db_write_string (db, &article->title, single, out, error))
     return FALSE;
 
   for (sl = article->sections; sl; sl = sl->next)
     {
       PdbDbSection *section = sl->data;
 
-      if (!pdb_db_write_string (db, &section->title, out, error) ||
-          !pdb_db_write_string (db, &section->text, out, error))
+      if (!pdb_db_write_string (db, &section->title, single, out, error) ||
+          !pdb_db_write_string (db, &section->text, single, out, error))
         return FALSE;
     }
 
@@ -2458,24 +2491,19 @@ pdb_db_save (PdbDb *db,
                                               article_name,
                                               NULL);
           gboolean write_status = TRUE;
-          FILE *out;
+          PdbFile out;
 
-          out = fopen (full_name, "w");
-
-          if (out == NULL)
-            {
-              g_set_error (error,
-                           G_FILE_ERROR,
-                           g_file_error_from_errno (errno),
-                           "%s: %s",
-                           full_name,
-                           strerror (errno));
-              write_status = FALSE;
-            }
+          if (!pdb_file_open (&out, full_name, error))
+            write_status = FALSE;
           else
             {
-              write_status = pdb_db_save_article (db, article, out, error);
-              fclose (out);
+              write_status = pdb_db_save_article (db,
+                                                  article,
+                                                  FALSE, /* single */
+                                                  &out,
+                                                  error);
+              if (!pdb_file_close (&out, write_status ? error : NULL))
+                write_status = FALSE;
             }
 
           g_free (full_name);
@@ -2490,6 +2518,92 @@ pdb_db_save (PdbDb *db,
     }
   else
     ret = FALSE;
+
+  return ret;
+}
+
+gboolean
+pdb_db_save_single (PdbDb *db,
+                    const char *filename,
+                    GError **error)
+{
+  PdbFile file;
+  gboolean ret = TRUE;
+
+  if (!pdb_file_open (&file, filename, error))
+    ret = FALSE;
+  else
+    {
+      if (pdb_file_write (&file, pdb_db_magic, sizeof (pdb_db_magic), error) &&
+          pdb_file_write_32 (&file, db->articles->len, error) &&
+          /* Skip past the article offset table which we'll fill in
+           * later */
+          pdb_file_seek (&file, db->articles->len * 4, SEEK_CUR, error) &&
+          pdb_lang_save_single (db->lang, &file, error))
+        {
+          int i;
+          guint32 *offset_table = g_alloca (db->articles->len *
+                                            sizeof (guint32));
+
+          for (i = 0; i < db->articles->len; i++)
+            {
+              PdbDbArticle *article = g_ptr_array_index (db->articles, i);
+              int old_pos = file.pos;
+              int article_len;
+
+              offset_table[i] = GUINT32_TO_LE (file.pos);
+
+              /* Leave space for the article size */
+              if (!pdb_file_seek (&file,
+                                  sizeof (guint32),
+                                  SEEK_CUR,
+                                  error) ||
+                  !pdb_db_save_article (db,
+                                        article,
+                                        TRUE, /* single */
+                                        &file,
+                                        error))
+                {
+                  ret = FALSE;
+                  goto done;
+                }
+
+              /* Fill in the article size */
+              article_len = file.pos - old_pos - sizeof (guint32);
+              if (!pdb_file_seek (&file,
+                                  old_pos,
+                                  SEEK_SET,
+                                  error) ||
+                  !pdb_file_write_32 (&file, article_len, error) ||
+                  !pdb_file_seek (&file, article_len, SEEK_CUR, error))
+                {
+                  ret = FALSE;
+                  goto done;
+                }
+            }
+
+          if (!pdb_file_seek (&file,
+                              sizeof (pdb_db_magic) + sizeof (guint32),
+                              SEEK_SET,
+                              error) ||
+              !pdb_file_write (&file,
+                               offset_table,
+                               db->articles->len * sizeof (guint32),
+                               error))
+            ret = FALSE;
+
+        done:
+          (void) 0;
+        }
+      else
+        ret = FALSE;
+
+      if (!pdb_file_close (&file, ret ? error : NULL))
+        ret = FALSE;
+
+      if (!ret)
+        g_unlink (filename);
+    }
 
   return ret;
 }

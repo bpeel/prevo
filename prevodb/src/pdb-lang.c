@@ -381,3 +381,94 @@ pdb_lang_save (PdbLang *lang,
 
   return TRUE;
 }
+
+typedef struct
+{
+  PdbLangEntry *entry;
+  int offset;
+} PdbLangSaveData;
+
+static int
+pdb_lang_sort_save_data (const void *a,
+                         const void *b)
+{
+  const PdbLangSaveData *pa = a;
+  const PdbLangSaveData *pb = b;
+
+  return strcmp (pa->entry->code, pb->entry->code);
+}
+
+gboolean
+pdb_lang_save_single (PdbLang *lang,
+                      PdbFile *file,
+                      GError **error)
+{
+  int n_langs = g_hash_table_size (lang->hash_table);
+  PdbLangSaveData *save_data = g_alloca (sizeof (PdbLangSaveData) * n_langs);
+  int table_pos, end_pos;
+  int i;
+
+  if (!pdb_file_write_32 (file, n_langs, error))
+    return FALSE;
+
+  table_pos = file->pos;
+
+  /* Seek past the offset table which we'll fill in later */
+  if (!pdb_file_seek (file, n_langs * 8, SEEK_CUR, error))
+    return FALSE;
+
+  for (i = 0; i < n_langs; i++)
+    save_data[i].entry = &g_array_index (lang->languages, PdbLangEntry, i);
+  qsort (save_data, n_langs, sizeof (PdbLangSaveData), pdb_lang_sort_save_data);
+
+  for (i = 0; i < n_langs; i++)
+    {
+      guint8 *compressed_data;
+      int compressed_len;
+      int write_status;
+
+      save_data[i].offset = file->pos;
+
+      if (!pdb_file_write (file,
+                           save_data[i].entry->name,
+                           strlen (save_data[i].entry->name) + 1,
+                           error))
+        return FALSE;
+
+      pdb_trie_compress (save_data[i].entry->trie,
+                         &compressed_data,
+                         &compressed_len);
+
+      write_status =
+        pdb_file_write (file, compressed_data, compressed_len, error);
+
+      g_free (compressed_data);
+
+      if (!write_status)
+        return FALSE;
+    }
+
+  end_pos = file->pos;
+
+  if (!pdb_file_seek (file, table_pos, SEEK_SET, error))
+    return FALSE;
+
+  for (i = 0; i < n_langs; i++)
+    {
+      PdbLangEntry *entry = save_data[i].entry;
+      int code_len = strlen (entry->code);
+      char code[4];
+
+      if (code_len > 3)
+        code_len = 3;
+
+      memcpy (code, entry->code, code_len);
+      memset (code + code_len, 0, sizeof (code) - code_len);
+
+      if (!pdb_file_write (file, code, sizeof (code), error) ||
+          !pdb_file_write_32 (file, save_data[i].offset, error))
+        return FALSE;
+    }
+
+  return pdb_file_seek (file, end_pos, SEEK_SET, error);
+}

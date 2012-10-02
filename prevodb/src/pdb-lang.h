@@ -22,6 +22,7 @@
 
 #include "pdb-revo.h"
 #include "pdb-trie.h"
+#include "pdb-file.h"
 
 typedef struct _PdbLang PdbLang;
 
@@ -47,5 +48,10 @@ gboolean
 pdb_lang_save (PdbLang *lang,
                const char *dir,
                GError **error);
+
+gboolean
+pdb_lang_save_single (PdbLang *lang,
+                      PdbFile *file,
+                      GError **error);
 
 #endif /* PDB_LANG_H */

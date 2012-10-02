@@ -22,12 +22,17 @@
 #include "pdb-revo.h"
 #include "pdb-db.h"
 
+static gboolean option_single = FALSE;
 static const char *option_in_file = NULL;
 static const char *option_out_file = NULL;
 
 static GOptionEntry
 options[] =
   {
+    {
+      "single", 's', 0, G_OPTION_ARG_NONE, &option_single,
+      "Generate a single file instead of a db for Android", NULL
+    },
     {
       "in", 'i', 0, G_OPTION_ARG_STRING, &option_in_file,
       "The zip file or directory containing the ReVo XML files", NULL
@@ -112,7 +117,14 @@ main (int argc, char **argv)
             }
           else
             {
-              if (!pdb_db_save (db, option_out_file, &error))
+              gboolean save_ret;
+
+              if (option_single)
+                save_ret = pdb_db_save_single (db, option_out_file, &error);
+              else
+                save_ret = pdb_db_save (db, option_out_file, &error);
+
+              if (!save_ret)
                 {
                   fprintf (stderr, "%s\n", error->message);
                   g_clear_error (&error);
