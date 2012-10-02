@@ -12,6 +12,8 @@ prevodb_SOURCES = \
 	pdb-doc.h \
 	pdb-error.c \
 	pdb-error.h \
+	pdb-file.c \
+	pdb-file.h \
 	pdb-lang.c \
 	pdb-lang.h \
 	pdb-list.c \
