@@ -1,4 +1,6 @@
-bin_PROGRAMS = prevodb
+bin_PROGRAMS = \
+	prevodb \
+	prevo
 
 INCLUDES = \
 	@GLIB_CFLAGS@ \
@@ -34,6 +36,15 @@ prevodb_SOURCES = \
 
 prevodb_LDADD = \
 	-lexpat \
+	@GLIB_LIBS@ \
+	$(NULL)
+
+prevo_SOURCES = \
+	pdb-file.c \
+	pdb-file.h \
+	prevo.c
+
+prevo_LDADD = \
 	@GLIB_LIBS@ \
 	$(NULL)
 
