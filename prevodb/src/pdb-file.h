@@ -24,13 +24,20 @@
 typedef struct
 {
   char *filename;
-  FILE *out;
+  FILE *file;
   size_t pos;
 } PdbFile;
+
+typedef enum
+{
+  PDB_FILE_MODE_READ,
+  PDB_FILE_MODE_WRITE,
+} PdbFileMode;
 
 gboolean
 pdb_file_open (PdbFile *file,
                const char *filename,
+               PdbFileMode mode,
                GError **error);
 
 gboolean
@@ -53,6 +60,27 @@ gboolean
 pdb_file_write_32 (PdbFile *file,
                    guint32 val,
                    GError **error);
+
+gboolean
+pdb_file_read (PdbFile *file,
+               void *data,
+               size_t size,
+               GError **error);
+
+gboolean
+pdb_file_read_8 (PdbFile *file,
+                 guint8 *val,
+                 GError **error);
+
+gboolean
+pdb_file_read_16 (PdbFile *file,
+                  guint16 *val,
+                  GError **error);
+
+gboolean
+pdb_file_read_32 (PdbFile *file,
+                  guint32 *val,
+                  GError **error);
 
 gboolean
 pdb_file_seek (PdbFile *file,

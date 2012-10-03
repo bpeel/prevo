@@ -2493,7 +2493,7 @@ pdb_db_save (PdbDb *db,
           gboolean write_status = TRUE;
           PdbFile out;
 
-          if (!pdb_file_open (&out, full_name, error))
+          if (!pdb_file_open (&out, full_name, PDB_FILE_MODE_WRITE, error))
             write_status = FALSE;
           else
             {
@@ -2530,7 +2530,7 @@ pdb_db_save_single (PdbDb *db,
   PdbFile file;
   gboolean ret = TRUE;
 
-  if (!pdb_file_open (&file, filename, error))
+  if (!pdb_file_open (&file, filename, PDB_FILE_MODE_WRITE, error))
     ret = FALSE;
   else
     {

@@ -28,11 +28,13 @@
 gboolean
 pdb_file_open (PdbFile *file,
                const char *filename,
+               PdbFileMode mode,
                GError **error)
 {
-  file->out = fopen (filename, "wb");
+  file->file = fopen (filename,
+                      mode == PDB_FILE_MODE_WRITE ? "wb" : "rb");
 
-  if (file->out == NULL)
+  if (file->file == NULL)
     {
       g_set_error (error,
                    G_FILE_ERROR,
@@ -53,7 +55,7 @@ pdb_file_write (PdbFile *file,
                 size_t size,
                 GError **error)
 {
-  if (fwrite (data, 1, size, file->out) != size)
+  if (fwrite (data, 1, size, file->file) != size)
     {
       g_set_error (error,
                    G_FILE_ERROR,
@@ -97,12 +99,78 @@ pdb_file_write_32 (PdbFile *file,
 }
 
 gboolean
+pdb_file_read (PdbFile *file,
+               void *data,
+               size_t size,
+               GError **error)
+{
+  errno = 0;
+
+  if (fread (data, 1, size, file->file) != size)
+    {
+      if (errno)
+        g_set_error (error,
+                     G_FILE_ERROR,
+                     g_file_error_from_errno (errno),
+                     "%s: %s", file->filename, strerror (errno));
+      else
+        g_set_error (error,
+                     G_FILE_ERROR,
+                     G_FILE_ERROR_IO,
+                     "%s: Unexpected EOF", file->filename);
+
+      return FALSE;
+    }
+  else
+    {
+      file->pos += size;
+      return TRUE;
+    }
+}
+
+gboolean
+pdb_file_read_8 (PdbFile *file,
+                 guint8 *val,
+                 GError **error)
+{
+  return pdb_file_read (file, val, sizeof (*val), error);
+}
+
+gboolean
+pdb_file_read_16 (PdbFile *file,
+                  guint16 *val,
+                  GError **error)
+{
+  if (pdb_file_read (file, val, sizeof (*val), error))
+    {
+      *val = GUINT16_FROM_LE (*val);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+gboolean
+pdb_file_read_32 (PdbFile *file,
+                  guint32 *val,
+                  GError **error)
+{
+  if (pdb_file_read (file, val, sizeof (*val), error))
+    {
+      *val = GUINT32_FROM_LE (*val);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+gboolean
 pdb_file_seek (PdbFile *file,
                long offset,
                int whence,
                GError **error)
 {
-  if (fseek (file->out, offset, whence) == 0)
+  if (fseek (file->file, offset, whence) == 0)
     {
       switch (whence)
         {
@@ -137,7 +205,7 @@ pdb_file_close (PdbFile *file,
 {
   gboolean ret = TRUE;
 
-  if (fclose (file->out) == EOF)
+  if (fclose (file->file) == EOF)
     {
       g_set_error (error,
                    G_FILE_ERROR,
