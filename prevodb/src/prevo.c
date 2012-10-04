@@ -26,6 +26,7 @@
 #include "pdb-revo.h"
 #include "pdb-db.h"
 #include "pdb-file.h"
+#include "pdb-groff.h"
 
 #define PREVO_ERROR (prevo_error_quark ())
 
@@ -660,6 +661,7 @@ complete_word (PdbFile *file,
 
 static gboolean
 show_spanned_string (PdbFile *file,
+                     FILE *out,
                      GError **error)
 {
   char *string_data;
@@ -674,7 +676,7 @@ show_spanned_string (PdbFile *file,
   if (!pdb_file_read (file, string_data, string_len, error))
     return FALSE;
 
-  fwrite (string_data, 1, string_len, stdout);
+  fwrite (string_data, 1, string_len, out);
 
   while (TRUE)
     {
@@ -699,6 +701,9 @@ show_article (PdbFile *file,
   guint32 article_offset;
   guint32 article_size;
   size_t article_end;
+  PdbGroff *groff;
+  FILE *out;
+  gboolean ret = TRUE;
 
   if (!pdb_file_seek (file, 4, SEEK_SET, error) ||
       !pdb_file_read_32 (file, &n_articles, error))
@@ -722,13 +727,31 @@ show_article (PdbFile *file,
 
   article_end = file->pos + article_size;
 
-  while (file->pos < article_end)
-    if (show_spanned_string (file, error))
-      fputs ("\n\n", stdout);
-    else
-      return FALSE;
+  groff = pdb_groff_new (error);
 
-  return TRUE;
+  if (groff == NULL)
+    return FALSE;
+
+  out = pdb_groff_get_output (groff);
+
+  while (file->pos < article_end)
+    if (show_spanned_string (file, out, error))
+      fputs ("\n\n", out);
+    else
+      {
+        ret = FALSE;
+        break;
+      }
+
+  if (ret)
+    {
+      if (!pdb_groff_display (groff, error))
+        ret = FALSE;
+    }
+
+  pdb_groff_free (groff);
+
+  return ret;
 }
 
 static gboolean

@@ -42,6 +42,8 @@ prevodb_LDADD = \
 prevo_SOURCES = \
 	pdb-file.c \
 	pdb-file.h \
+	pdb-groff.c \
+	pdb-groff.h \
 	prevo.c
 
 prevo_LDADD = \
