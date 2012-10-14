@@ -26,6 +26,8 @@
   <string name="menu_choose_language">Elektu lingvon</string>
   <string name="menu_search">Serĉu</string>
   <string name="menu_about">Pri</string>
+  <string name="menu_copy_definition">Kopiu difinon</string>
+  <string name="definition_label">Difino</string>
   <string name="close">Fermu</string>
   <string name="about_message">
 <b>PReVo @VERSION@</b>\n

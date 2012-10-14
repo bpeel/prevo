@@ -21,6 +21,7 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.view.ContextMenu;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
@@ -36,6 +37,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.KeyEvent;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.InputStream;
@@ -267,8 +269,10 @@ public class ArticleActivity extends Activity
           }
         else
           {
-            tv = new TextView (this);
+            tv = new DefinitionView (this);
             isTitle = true;
+
+            registerForContextMenu (tv);
           }
 
         tv.setMovementMethod (LinkMovementMethod.getInstance ());
@@ -357,5 +361,44 @@ public class ArticleActivity extends Activity
       }
 
     return super.onKeyDown (keyCode, event);
+  }
+
+  @Override
+  public void onCreateContextMenu (ContextMenu menu,
+                                   View v,
+                                   ContextMenu.ContextMenuInfo menuInfo)
+  {
+    super.onCreateContextMenu (menu, v, menuInfo);
+
+    if (v instanceof TextView)
+      {
+        MenuInflater inflater = getMenuInflater ();
+        inflater.inflate (R.menu.definition_menu, menu);
+      }
+  }
+
+  @Override
+  public boolean onContextItemSelected (MenuItem item)
+  {
+    ContextMenu.ContextMenuInfo info = item.getMenuInfo ();
+
+    switch (item.getItemId())
+      {
+      case R.id.menu_copy_definition:
+        if (info instanceof DefinitionView.DefinitionContextMenuInfo)
+          {
+            CharSequence label =
+              getResources ().getText (R.string.definition_label);
+            CharSequence text =
+              ((DefinitionView.DefinitionContextMenuInfo) info).text;
+
+            SpannedCopy.copyText (this, label, text);
+
+            return true;
+          }
+        break;
+      }
+
+    return super.onContextItemSelected(item);
   }
 }
