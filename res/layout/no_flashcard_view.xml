@@ -17,11 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<menu xmlns:a="http://schemas.android.com/apk/res/android">
-  <item a:id="@+id/menu_copy_definition"
-        a:title="@string/menu_copy_definition" />
-  <item a:id="@+id/menu_create_flashcard_word"
-        a:title="@string/menu_create_flashcard_word" />
-  <item a:id="@+id/menu_create_flashcard_definition"
-        a:title="@string/menu_create_flashcard_definition" />
-</menu>
+<TextView xmlns:a="http://schemas.android.com/apk/res/android"
+          a:id="@+id/about_view"
+          a:layout_width="match_parent"
+          a:layout_height="wrap_content"
+          a:padding="6sp"
+          a:text="@string/no_flashcard"
+          style="?android:attr/textAppearanceMedium" />

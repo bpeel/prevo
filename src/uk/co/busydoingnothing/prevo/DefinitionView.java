@@ -23,24 +23,35 @@ import android.view.ContextMenu.ContextMenuInfo;
 
 public class DefinitionView extends TextView
 {
+  private CharSequence word;
+  private CharSequence definition;
+
   public class DefinitionContextMenuInfo implements ContextMenuInfo
   {
-    public CharSequence text;
+    public CharSequence word;
+    public CharSequence definition;
   }
 
   private DefinitionContextMenuInfo contextMenuInfo;
 
-  public DefinitionView (Context context)
+  public DefinitionView (Context context,
+                         CharSequence word,
+                         CharSequence definition)
   {
     super (context);
+
+    this.word = word;
+    this.definition = definition;
   }
 
   public ContextMenuInfo getContextMenuInfo ()
   {
     if (contextMenuInfo == null)
-      contextMenuInfo = new DefinitionContextMenuInfo ();
-
-    contextMenuInfo.text = getText ();
+      {
+        contextMenuInfo = new DefinitionContextMenuInfo ();
+        contextMenuInfo.word = this.word;
+        contextMenuInfo.definition = this.definition;
+      }
 
     return contextMenuInfo;
   }

@@ -27,6 +27,9 @@
   <string name="menu_search">Serĉu</string>
   <string name="menu_about">Pri</string>
   <string name="menu_copy_definition">Kopiu difinon</string>
+  <string name="menu_create_flashcard_word">Kreu fulmkarton, difino→vorto</string>
+  <string name="menu_create_flashcard_definition">Kreu fulmkarton, vorto→difino</string>
+  <string name="no_flashcard">Mankas aplikaĵo kiu povas krei fulmkarton. Eble vi volos instali “Anki” el Google Play.</string>
   <string name="definition_label">Difino</string>
   <string name="close">Fermu</string>
   <string name="about_message">

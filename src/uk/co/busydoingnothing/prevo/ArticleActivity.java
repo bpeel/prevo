@@ -18,9 +18,12 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.view.ContextMenu;
 import android.os.Bundle;
 import android.text.SpannableString;
@@ -51,7 +54,20 @@ public class ArticleActivity extends Activity
   public static final String EXTRA_MARK_NUMBER =
     "uk.co.busydoingnothing.prevo.MarkNumber";
 
+  /* http://www.openintents.org/en/node/720 */
+  /* The second one is used by Anki 1.1.3 and the first one only works
+   * in Anki 2.0 so we just try both */
+  private static final String[] ACTION_CREATE_FLASHCARD =
+  {
+    "org.openintents.action.CREATE_FLASHCARD",
+    "org.openintents.indiclash.CREATE_FLASHCARD"
+  };
+  public static final String SOURCE_TEXT = "SOURCE_TEXT";
+  public static final String TARGET_TEXT = "TARGET_TEXT";
+
   public static final String TAG = "prevoarticle";
+
+  public static final int DIALOG_NO_FLASHCARD = 0x10c;
 
   private Vector<TextView> sectionHeaders;
 
@@ -252,6 +268,7 @@ public class ArticleActivity extends Activity
     layout.setOrientation (LinearLayout.VERTICAL);
 
     SpannableString str;
+    SpannableString lastTitle = null;
     boolean isTitle = true;
     LayoutInflater layoutInflater = getLayoutInflater ();
 
@@ -266,10 +283,11 @@ public class ArticleActivity extends Activity
                                                     false);
             isTitle = false;
             sectionHeaders.add (tv);
+            lastTitle = str;
           }
         else
           {
-            tv = new DefinitionView (this);
+            tv = new DefinitionView (this, lastTitle, str);
             isTitle = true;
 
             registerForContextMenu (tv);
@@ -347,7 +365,36 @@ public class ArticleActivity extends Activity
   @Override
   protected Dialog onCreateDialog (int id)
   {
-    return MenuHelper.onCreateDialog (this, id);
+    Resources res = getResources ();
+
+    switch (id)
+      {
+      case DIALOG_NO_FLASHCARD:
+        {
+          AlertDialog.Builder builder = new AlertDialog.Builder (this);
+
+          LayoutInflater layoutInflater = getLayoutInflater ();
+          TextView tv =
+            (TextView) layoutInflater.inflate (R.layout.no_flashcard_view,
+                                               null);
+          builder
+            .setView (tv)
+            .setCancelable (true)
+            .setNegativeButton (R.string.close,
+                                new DialogInterface.OnClickListener ()
+                                {
+                                  @Override
+                                  public void onClick (DialogInterface dialog,
+                                                       int whichButton)
+                                  {
+                                  }
+                                });
+          return builder.create ();
+        }
+
+      default:
+        return MenuHelper.onCreateDialog (this, id);
+      }
   }
 
   @Override
@@ -377,26 +424,62 @@ public class ArticleActivity extends Activity
       }
   }
 
+  private void createFlashcard (CharSequence sourceText,
+                                CharSequence targetText)
+  {
+    Intent intent = new Intent ();
+    int i;
+
+    intent.putExtra (SOURCE_TEXT, sourceText.toString ());
+    intent.putExtra (TARGET_TEXT, targetText.toString ());
+
+    for (i = 0; i < ACTION_CREATE_FLASHCARD.length; i++)
+      {
+        intent.setAction (ACTION_CREATE_FLASHCARD[i]);
+
+        try
+          {
+            startActivity (intent);
+            break;
+          }
+        catch (android.content.ActivityNotFoundException e)
+          {
+            Log.i (TAG, "Failed to start activity: " + e.getMessage ());
+          }
+      }
+
+    if (i >= ACTION_CREATE_FLASHCARD.length)
+      showDialog (DIALOG_NO_FLASHCARD);
+  }
+
   @Override
   public boolean onContextItemSelected (MenuItem item)
   {
     ContextMenu.ContextMenuInfo info = item.getMenuInfo ();
 
-    switch (item.getItemId())
+    if (info instanceof DefinitionView.DefinitionContextMenuInfo)
       {
-      case R.id.menu_copy_definition:
-        if (info instanceof DefinitionView.DefinitionContextMenuInfo)
+        DefinitionView.DefinitionContextMenuInfo defInfo =
+          (DefinitionView.DefinitionContextMenuInfo) info;
+
+        switch (item.getItemId())
           {
+          case R.id.menu_copy_definition:
             CharSequence label =
               getResources ().getText (R.string.definition_label);
-            CharSequence text =
-              ((DefinitionView.DefinitionContextMenuInfo) info).text;
 
-            SpannedCopy.copyText (this, label, text);
+            SpannedCopy.copyText (this, label, defInfo.definition);
 
             return true;
+
+          case R.id.menu_create_flashcard_word:
+            createFlashcard (defInfo.definition, defInfo.word);
+            return true;
+
+          case R.id.menu_create_flashcard_definition:
+            createFlashcard (defInfo.word, defInfo.definition);
+            return true;
           }
-        break;
       }
 
     return super.onContextItemSelected(item);
