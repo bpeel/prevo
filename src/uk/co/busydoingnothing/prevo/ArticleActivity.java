@@ -24,8 +24,11 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.content.SharedPreferences;
 import android.view.ContextMenu;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
@@ -34,6 +37,7 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.text.style.SuperscriptSpan;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -42,12 +46,15 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.ZoomControls;
 import java.io.InputStream;
 import java.io.IOException;
 import java.util.Vector;
 
 public class ArticleActivity extends Activity
+  implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   public static final String EXTRA_ARTICLE_NUMBER =
     "uk.co.busydoingnothing.prevo.ArticleNumber";
@@ -70,9 +77,27 @@ public class ArticleActivity extends Activity
   public static final int DIALOG_NO_FLASHCARD = 0x10c;
 
   private Vector<TextView> sectionHeaders;
+  private Vector<TextView> definitions;
 
   private DelayedScrollView scrollView;
   private int articleNumber;
+
+  private ZoomControls zoomControls;
+  private RelativeLayout layout;
+
+  /* There are 10 font sizes ranging from 0 to 9. The actual font size
+   * used is calculated from a logarithmic scale and set in density
+   * independent pixels */
+  private static final int N_FONT_SIZES = 10;
+  private static final float FONT_SIZE_ROOT = 1.2f;
+
+  private int fontSize = N_FONT_SIZES / 2;
+  private float titleBaseTextSize;
+  private float definitionBaseTextSize;
+
+  private static final int MSG_HIDE_ZOOM_CONTROLS = 4;
+
+  private Handler handler;
 
   private static void throwEOF ()
     throws IOException
@@ -284,13 +309,18 @@ public class ArticleActivity extends Activity
             isTitle = false;
             sectionHeaders.add (tv);
             lastTitle = str;
+
+            titleBaseTextSize = tv.getTextSize ();
           }
         else
           {
             tv = new DefinitionView (this, lastTitle, str);
             isTitle = true;
+            definitions.add (tv);
 
             registerForContextMenu (tv);
+
+            definitionBaseTextSize = tv.getTextSize ();
           }
 
         tv.setMovementMethod (LinkMovementMethod.getInstance ());
@@ -311,16 +341,58 @@ public class ArticleActivity extends Activity
     scrollView.delayedScrollTo (sectionHeaders.get (section));
   }
 
+  private void updateZoomability ()
+  {
+    if (zoomControls != null)
+      {
+        zoomControls.setIsZoomInEnabled (fontSize < N_FONT_SIZES - 1);
+        zoomControls.setIsZoomOutEnabled (fontSize > 0);
+      }
+  }
+
+  private void setFontSize (int fontSize)
+  {
+    if (fontSize < 0)
+      fontSize = 0;
+    else if (fontSize >= N_FONT_SIZES)
+      fontSize = N_FONT_SIZES - 1;
+
+    if (fontSize != this.fontSize)
+      {
+        float fontSizeScale = (float) Math.pow (FONT_SIZE_ROOT,
+                                                fontSize - N_FONT_SIZES / 2);
+        float titleFontSize = titleBaseTextSize * fontSizeScale;
+        float definitionFontSize = definitionBaseTextSize * fontSizeScale;
+
+        Log.i (TAG, "fontSize = " + fontSize);
+        Log.i (TAG, "fontSizeScale = " + fontSizeScale);
+
+        for (TextView tv : sectionHeaders)
+          tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, titleFontSize);
+
+        for (TextView tv : definitions)
+          tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, definitionFontSize);
+
+        this.fontSize = fontSize;
+
+        updateZoomability ();
+      }
+  }
+
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
 
     Intent intent = getIntent ();
-    scrollView = new DelayedScrollView (this);
 
-    setContentView (scrollView);
+    setContentView (R.layout.article);
+
+    scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
+    layout = (RelativeLayout) findViewById (R.id.article_layout);
+
     sectionHeaders = new Vector<TextView> ();
+    definitions = new Vector<TextView> ();
 
     if (intent != null)
       {
@@ -344,13 +416,124 @@ public class ArticleActivity extends Activity
   }
 
   @Override
+  public void onStart ()
+  {
+    super.onStart ();
+
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+
+    setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
+
+    prefs.registerOnSharedPreferenceChangeListener (this);
+  }
+
+  @Override
+  public void onStop ()
+  {
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+
+    prefs.unregisterOnSharedPreferenceChangeListener (this);
+
+    super.onStop ();
+  }
+
+  @Override
   public boolean onCreateOptionsMenu (Menu menu)
   {
     MenuInflater inflater = getMenuInflater ();
 
-    inflater.inflate (R.menu.other_menu, menu);
+    inflater.inflate (R.menu.article_menu, menu);
 
     return true;
+  }
+
+  private void zoom (int direction)
+  {
+    int fontSize = this.fontSize + direction;
+
+    if (fontSize >= N_FONT_SIZES)
+      fontSize = N_FONT_SIZES - 1;
+    else if (fontSize < 0)
+      fontSize = 0;
+
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit ();
+    editor.putInt (MenuHelper.PREF_FONT_SIZE, fontSize);
+    editor.commit ();
+
+    setHideZoom ();
+    updateZoomability ();
+  }
+
+  private void setHideZoom ()
+  {
+    handler.removeMessages (MSG_HIDE_ZOOM_CONTROLS);
+    handler.sendEmptyMessageDelayed (MSG_HIDE_ZOOM_CONTROLS, 10000);
+  }
+
+  private void showZoomController ()
+  {
+    if (zoomControls == null)
+      {
+        final int wrap = RelativeLayout.LayoutParams.WRAP_CONTENT;
+        RelativeLayout.LayoutParams lp =
+          new RelativeLayout.LayoutParams (wrap, wrap);
+        final float scale = getResources ().getDisplayMetrics ().density;
+
+        lp.addRule (RelativeLayout.CENTER_HORIZONTAL);
+        lp.addRule (RelativeLayout.ALIGN_PARENT_BOTTOM);
+        lp.bottomMargin = (int) (10.0f * scale + 0.5f);
+
+        zoomControls = new ZoomControls (this);
+        zoomControls.setVisibility (View.GONE);
+        layout.addView (zoomControls, lp);
+
+        zoomControls.setOnZoomInClickListener (new View.OnClickListener ()
+          {
+            @Override
+            public void onClick (View v)
+            {
+              zoom (+1);
+            }
+          });
+        zoomControls.setOnZoomOutClickListener (new View.OnClickListener ()
+          {
+            @Override
+            public void onClick (View v)
+            {
+              zoom (-1);
+            }
+          });
+
+        handler = new Handler ()
+          {
+            @Override
+            public void handleMessage (Message msg)
+            {
+              switch (msg.what)
+                {
+                case MSG_HIDE_ZOOM_CONTROLS:
+                  if (zoomControls != null)
+                    zoomControls.hide ();
+                  break;
+                }
+            }
+          };
+
+        updateZoomability ();
+      }
+
+    if (zoomControls.getVisibility () != View.VISIBLE)
+      {
+        zoomControls.show ();
+        setHideZoom ();
+      }
   }
 
   @Override
@@ -358,6 +541,13 @@ public class ArticleActivity extends Activity
   {
     if (MenuHelper.onOptionsItemSelected (this, item))
       return true;
+
+    switch (item.getItemId ())
+      {
+      case R.id.menu_zoom:
+        showZoomController ();
+        return true;
+      }
 
     return super.onOptionsItemSelected (item);
   }
@@ -483,5 +673,13 @@ public class ArticleActivity extends Activity
       }
 
     return super.onContextItemSelected(item);
+  }
+
+  @Override
+  public void onSharedPreferenceChanged (SharedPreferences prefs,
+                                         String key)
+  {
+    if (key.equals (MenuHelper.PREF_FONT_SIZE))
+      setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
   }
 }

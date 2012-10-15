@@ -121,7 +121,7 @@ public class SearchActivity extends ListActivity
   {
     MenuInflater inflater = getMenuInflater ();
 
-    inflater.inflate (R.menu.other_menu, menu);
+    inflater.inflate (R.menu.search_menu, menu);
 
     menu.removeItem (R.id.menu_search);
 

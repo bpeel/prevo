@@ -48,6 +48,8 @@ public class MenuHelper
     "PrevoPreferences";
   public static final String PREF_LAST_LANGUAGE =
     "lastLanguage";
+  public static final String PREF_FONT_SIZE =
+    "fontSize";
 
   private static final int DIALOG_ABOUT = 0;
 
