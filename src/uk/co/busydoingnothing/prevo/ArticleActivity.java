@@ -364,9 +364,6 @@ public class ArticleActivity extends Activity
         float titleFontSize = titleBaseTextSize * fontSizeScale;
         float definitionFontSize = definitionBaseTextSize * fontSizeScale;
 
-        Log.i (TAG, "fontSize = " + fontSize);
-        Log.i (TAG, "fontSizeScale = " + fontSizeScale);
-
         for (TextView tv : sectionHeaders)
           tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, titleFontSize);
 
