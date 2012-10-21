@@ -62,13 +62,10 @@ public class ArticleActivity extends Activity
     "uk.co.busydoingnothing.prevo.MarkNumber";
 
   /* http://www.openintents.org/en/node/720 */
-  /* The second one is used by Anki 1.1.3 and the first one only works
-   * in Anki 2.0 so we just try both */
-  private static final String[] ACTION_CREATE_FLASHCARD =
-  {
-    "org.openintents.action.CREATE_FLASHCARD",
-    "org.openintents.indiclash.CREATE_FLASHCARD"
-  };
+  /* This probably only works with AnkiDroid 2.0 */
+  private static final String ACTION_CREATE_FLASHCARD =
+    "org.openintents.action.CREATE_FLASHCARD";
+
   public static final String SOURCE_TEXT = "SOURCE_TEXT";
   public static final String TARGET_TEXT = "TARGET_TEXT";
 
@@ -620,23 +617,17 @@ public class ArticleActivity extends Activity
     intent.putExtra (SOURCE_TEXT, sourceText.toString ());
     intent.putExtra (TARGET_TEXT, targetText.toString ());
 
-    for (i = 0; i < ACTION_CREATE_FLASHCARD.length; i++)
+    intent.setAction (ACTION_CREATE_FLASHCARD);
+
+    try
       {
-        intent.setAction (ACTION_CREATE_FLASHCARD[i]);
-
-        try
-          {
-            startActivity (intent);
-            break;
-          }
-        catch (android.content.ActivityNotFoundException e)
-          {
-            Log.i (TAG, "Failed to start activity: " + e.getMessage ());
-          }
+        startActivity (intent);
       }
-
-    if (i >= ACTION_CREATE_FLASHCARD.length)
-      showDialog (DIALOG_NO_FLASHCARD);
+    catch (android.content.ActivityNotFoundException e)
+      {
+        Log.i (TAG, "Failed to start activity: " + e.getMessage ());
+        showDialog (DIALOG_NO_FLASHCARD);
+      }
   }
 
   @Override
