@@ -49,9 +49,9 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.ZoomControls;
-import java.io.InputStream;
 import java.io.IOException;
 import java.util.Vector;
+import java.util.Locale;
 
 public class ArticleActivity extends Activity
   implements SharedPreferences.OnSharedPreferenceChangeListener
@@ -96,103 +96,25 @@ public class ArticleActivity extends Activity
 
   private Handler handler;
 
-  private static void throwEOF ()
+  private SpannableString readSpannableString (BinaryReader in)
     throws IOException
   {
-    throw new IOException ("Unexpected EOF");
-  }
-
-  private boolean maybeReadAll (InputStream in,
-                                byte[] array,
-                                int offset,
-                                int length)
-    throws IOException
-  {
-    while (length > 0)
-      {
-        int got = in.read (array, offset, length);
-
-        if (got == -1)
-          return false;
-
-        offset += got;
-        length -= got;
-      }
-
-    return true;
-  }
-
-  private boolean maybeReadAll (InputStream in,
-                                byte[] array)
-    throws IOException
-  {
-    return maybeReadAll (in, array, 0, array.length);
-  }
-
-  private void readAll (InputStream in,
-                        byte[] array,
-                        int offset,
-                        int length)
-    throws IOException
-  {
-    if (!maybeReadAll (in, array, offset, length))
-      throwEOF ();
-  }
-
-  private void readAll (InputStream in,
-                        byte[] array)
-    throws IOException
-  {
-    readAll (in, array, 0, array.length);
-  }
-
-  private int maybeReadShort (InputStream in)
-    throws IOException
-  {
-    byte[] shortBuf = new byte[2];
-    if (maybeReadAll (in, shortBuf))
-      return (shortBuf[0] & 0xff) | ((shortBuf[1] & 0xff) << 8);
-    else
-      return -1;
-  }
-
-  private int readShort (InputStream in)
-    throws IOException
-  {
-    int val = maybeReadShort (in);
-
-    if (val == -1)
-      throwEOF ();
-
-    return val;
-  }
-
-  private SpannableString maybeReadSpannableString (InputStream in)
-    throws IOException
-  {
-    int strLength = maybeReadShort (in);
-
-    if (strLength == -1)
-      return null;
-
+    int strLength = in.readShort ();
     byte[] utf8String = new byte[strLength];
 
-    readAll (in, utf8String);
+    in.readAll (utf8String);
 
     SpannableString string =
       new SpannableString (new String (utf8String));
 
     int spanLength;
 
-    while ((spanLength = readShort (in)) != 0)
+    while ((spanLength = in.readShort ()) != 0)
       {
-        int spanStart = readShort (in);
-        int data1 = readShort (in);
-        final int data2 = readShort (in);
-        int spanType = in.read ();
-
-        if (spanType == -1)
-          throwEOF ();
+        int spanStart = in.readShort ();
+        int data1 = in.readShort ();
+        final int data2 = in.readShort ();
+        int spanType = in.readByte ();
 
         if (spanStart < 0 || spanLength < 0 ||
             spanStart + spanLength > string.length ())
@@ -267,35 +189,46 @@ public class ArticleActivity extends Activity
     return string;
   }
 
-  private SpannableString readSpannableString (InputStream in)
+  private void skipArticles (BinaryReader in,
+                             int numArticles)
     throws IOException
   {
-    SpannableString val = maybeReadSpannableString (in);
+    char buf[] = null;
 
-    if (val == null)
-      throwEOF ();
+    for (int i = 0; i < numArticles; i++)
+      {
+        int articleLength = in.readInt ();
 
-    return val;
+        in.skip (articleLength);
+      }
   }
 
   private LinearLayout loadArticle (int article)
     throws IOException
   {
     AssetManager assetManager = getAssets ();
-    InputStream in = assetManager.open ("articles/article-" + article + ".bin");
+    String filename = String.format (Locale.US,
+                                     "articles/article-%03xx.bin",
+                                     article >> 4);
+    BinaryReader in = new BinaryReader (assetManager.open (filename));
+
+    skipArticles (in, article & 0xf);
+
+    int articleLength = in.readInt ();
+    long articleStart = in.getPosition ();
 
     setTitle (readSpannableString (in));
 
     LinearLayout layout = new LinearLayout (this);
     layout.setOrientation (LinearLayout.VERTICAL);
 
-    SpannableString str;
     SpannableString lastTitle = null;
     boolean isTitle = true;
     LayoutInflater layoutInflater = getLayoutInflater ();
 
-    while ((str = maybeReadSpannableString (in)) != null)
+    while (in.getPosition () - articleStart < articleLength)
       {
+        SpannableString str = readSpannableString (in);
         TextView tv;
 
         if (isTitle)
