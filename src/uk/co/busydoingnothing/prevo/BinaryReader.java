@@ -24,6 +24,7 @@ public class BinaryReader
 {
   private long position = 0;
   private InputStream in;
+  private byte numberBuffer[] = new byte[4];
 
   public BinaryReader (InputStream in)
   {
@@ -77,24 +78,20 @@ public class BinaryReader
   public int readShort ()
     throws IOException
   {
-    byte[] shortBuf = new byte[2];
+    readAll (numberBuffer, 0, 2);
 
-    readAll (shortBuf);
-
-    return (shortBuf[0] & 0xff) | ((shortBuf[1] & 0xff) << 8);
+    return (numberBuffer[0] & 0xff) | ((numberBuffer[1] & 0xff) << 8);
   }
 
   public int readInt ()
     throws IOException
   {
-    byte[] intBuf = new byte[4];
+    readAll (numberBuffer, 0, 4);
 
-    readAll (intBuf);
-
-    return ((intBuf[0] & 0xff) |
-            ((intBuf[1] & 0xff) << 8) |
-            ((intBuf[2] & 0xff) << 16) |
-            ((intBuf[3] & 0xff) << 24));
+    return ((numberBuffer[0] & 0xff) |
+            ((numberBuffer[1] & 0xff) << 8) |
+            ((numberBuffer[2] & 0xff) << 16) |
+            ((numberBuffer[3] & 0xff) << 24));
   }
 
   public long getPosition ()
