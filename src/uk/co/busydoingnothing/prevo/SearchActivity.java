@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -68,6 +68,8 @@ public class SearchActivity extends ListActivity
 
                 TextView tv = (TextView) findViewById (R.id.search_edit);
                 tv.addTextChangedListener (this);
+
+                setTitle (getTitle () + " [" + language + "]");
               }
             catch (java.io.IOException e)
               {
