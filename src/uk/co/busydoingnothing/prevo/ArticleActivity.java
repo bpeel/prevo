@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -189,6 +189,21 @@ public class ArticleActivity extends Activity
     return string;
   }
 
+  private String readString (BinaryReader in,
+                             int maxLength)
+    throws IOException
+  {
+    byte buf[] = new byte[maxLength];
+
+    in.readAll (buf);
+
+    int len = 3;
+    while (len > 0 && buf[len - 1] == '\0')
+      len--;
+
+    return new String (buf, 0, len);
+  }
+
   private void skipArticles (BinaryReader in,
                              int numArticles)
     throws IOException
@@ -222,41 +237,33 @@ public class ArticleActivity extends Activity
     LinearLayout layout = new LinearLayout (this);
     layout.setOrientation (LinearLayout.VERTICAL);
 
-    SpannableString lastTitle = null;
-    boolean isTitle = true;
     LayoutInflater layoutInflater = getLayoutInflater ();
+    TextView tv[] = new TextView[2];
 
     while (in.getPosition () - articleStart < articleLength)
       {
-        SpannableString str = readSpannableString (in);
-        TextView tv;
+        String languageCode = readString (in, 3);
+        SpannableString header = readSpannableString (in);
+        SpannableString content = readSpannableString (in);
 
-        if (isTitle)
+        tv[0] = (TextView) layoutInflater.inflate (R.layout.section_header,
+                                                   layout,
+                                                   false);
+        sectionHeaders.add (tv[0]);
+        titleBaseTextSize = tv[0].getTextSize ();
+        tv[0].setText (header, TextView.BufferType.SPANNABLE);
+
+        tv[1] = new DefinitionView (this, header, content);
+        definitions.add (tv[1]);
+        tv[1].setText (content, TextView.BufferType.SPANNABLE);
+        registerForContextMenu (tv[1]);
+        definitionBaseTextSize = tv[1].getTextSize ();
+
+        for (int i = 0; i < tv.length; i++)
           {
-            tv = (TextView) layoutInflater.inflate (R.layout.section_header,
-                                                    layout,
-                                                    false);
-            isTitle = false;
-            sectionHeaders.add (tv);
-            lastTitle = str;
-
-            titleBaseTextSize = tv.getTextSize ();
+            tv[i].setMovementMethod (LinkMovementMethod.getInstance ());
+            layout.addView (tv[i]);
           }
-        else
-          {
-            tv = new DefinitionView (this, lastTitle, str);
-            isTitle = true;
-            definitions.add (tv);
-
-            registerForContextMenu (tv);
-
-            definitionBaseTextSize = tv.getTextSize ();
-          }
-
-        tv.setMovementMethod (LinkMovementMethod.getInstance ());
-        tv.setText (str, TextView.BufferType.SPANNABLE);
-
-        layout.addView (tv);
       }
 
     return layout;
