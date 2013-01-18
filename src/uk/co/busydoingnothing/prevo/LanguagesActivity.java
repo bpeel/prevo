@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
+import android.app.Activity;
 import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;
@@ -34,6 +35,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 public class LanguagesActivity extends ListActivity
+  implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   private LanguageDatabaseHelper dbHelper;
   private LanguagesAdapter adapter;
@@ -93,7 +95,24 @@ public class LanguagesActivity extends ListActivity
   {
     super.onStart ();
 
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+    prefs.registerOnSharedPreferenceChangeListener (this);
+
     adapter.setMainLanguages (dbHelper.getLanguages ());
+  }
+
+  @Override
+  public void onStop ()
+  {
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+
+    prefs.unregisterOnSharedPreferenceChangeListener (this);
+
+    super.onStop ();
   }
 
   @Override
@@ -119,5 +138,13 @@ public class LanguagesActivity extends ListActivity
   protected Dialog onCreateDialog (int id)
   {
     return MenuHelper.onCreateDialog (this, id);
+  }
+
+  @Override
+  public void onSharedPreferenceChanged (SharedPreferences prefs,
+                                         String key)
+  {
+    if (key.equals (SelectedLanguages.PREF))
+      adapter.reload ();
   }
 }

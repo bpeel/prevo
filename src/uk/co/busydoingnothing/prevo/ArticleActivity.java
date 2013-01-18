@@ -96,6 +96,19 @@ public class ArticleActivity extends Activity
 
   private Handler handler;
 
+  private void skipSpannableString (BinaryReader in)
+    throws IOException
+  {
+    int strLength = in.readShort ();
+
+    in.skip (strLength);
+
+    int spanLength;
+
+    while ((spanLength = in.readShort ()) != 0)
+      in.skip (2 + 2 + 2 + 1);
+  }
+
   private SpannableString readSpannableString (BinaryReader in)
     throws IOException
   {
@@ -240,29 +253,40 @@ public class ArticleActivity extends Activity
     LayoutInflater layoutInflater = getLayoutInflater ();
     TextView tv[] = new TextView[2];
 
+    SelectedLanguages selectedLanguages = new SelectedLanguages (this);
+
     while (in.getPosition () - articleStart < articleLength)
       {
         String languageCode = readString (in, 3);
-        SpannableString header = readSpannableString (in);
-        SpannableString content = readSpannableString (in);
 
-        tv[0] = (TextView) layoutInflater.inflate (R.layout.section_header,
-                                                   layout,
-                                                   false);
-        sectionHeaders.add (tv[0]);
-        titleBaseTextSize = tv[0].getTextSize ();
-        tv[0].setText (header, TextView.BufferType.SPANNABLE);
-
-        tv[1] = new DefinitionView (this, header, content);
-        definitions.add (tv[1]);
-        tv[1].setText (content, TextView.BufferType.SPANNABLE);
-        registerForContextMenu (tv[1]);
-        definitionBaseTextSize = tv[1].getTextSize ();
-
-        for (int i = 0; i < tv.length; i++)
+        if (selectedLanguages.contains (languageCode))
           {
-            tv[i].setMovementMethod (LinkMovementMethod.getInstance ());
-            layout.addView (tv[i]);
+            SpannableString header = readSpannableString (in);
+            SpannableString content = readSpannableString (in);
+
+            tv[0] = (TextView) layoutInflater.inflate (R.layout.section_header,
+                                                       layout,
+                                                       false);
+            sectionHeaders.add (tv[0]);
+            titleBaseTextSize = tv[0].getTextSize ();
+            tv[0].setText (header, TextView.BufferType.SPANNABLE);
+
+            tv[1] = new DefinitionView (this, header, content);
+            definitions.add (tv[1]);
+            tv[1].setText (content, TextView.BufferType.SPANNABLE);
+            registerForContextMenu (tv[1]);
+            definitionBaseTextSize = tv[1].getTextSize ();
+
+            for (int i = 0; i < tv.length; i++)
+              {
+                tv[i].setMovementMethod (LinkMovementMethod.getInstance ());
+                layout.addView (tv[i]);
+              }
+          }
+        else
+          {
+            skipSpannableString (in);
+            skipSpannableString (in);
           }
       }
 
@@ -313,11 +337,8 @@ public class ArticleActivity extends Activity
       }
   }
 
-  @Override
-  public void onCreate (Bundle savedInstanceState)
+  private void loadIntendedArticle ()
   {
-    super.onCreate (savedInstanceState);
-
     Intent intent = getIntent ();
 
     setContentView (R.layout.article);
@@ -347,6 +368,14 @@ public class ArticleActivity extends Activity
               }
           }
       }
+  }
+
+  @Override
+  public void onCreate (Bundle savedInstanceState)
+  {
+    super.onCreate (savedInstanceState);
+
+    loadIntendedArticle ();
   }
 
   @Override
@@ -609,5 +638,7 @@ public class ArticleActivity extends Activity
   {
     if (key.equals (MenuHelper.PREF_FONT_SIZE))
       setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
+    else if (key.equals (SelectedLanguages.PREF))
+      loadIntendedArticle ();
   }
 }

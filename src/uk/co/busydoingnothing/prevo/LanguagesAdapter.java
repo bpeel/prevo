@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,6 +39,7 @@ public class LanguagesAdapter extends BaseAdapter
   };
 
   private Language[] allLanguages;
+  private Language[] selectedLanguages;
 
   private Context context;
   private LanguagesFilter filter;
@@ -51,6 +53,7 @@ public class LanguagesAdapter extends BaseAdapter
   {
     this.context = context;
     this.allLanguages = getAllLanguages ();
+    this.selectedLanguages = getSelectedLanguages ();
   }
 
   private Language[] getAllLanguages ()
@@ -73,6 +76,7 @@ public class LanguagesAdapter extends BaseAdapter
                 if (parser.getName ().equals ("lang"))
                   {
                     String code = parser.getAttributeValue (null, "code");
+
                     language.setLength (0);
 
                     while (true)
@@ -85,7 +89,8 @@ public class LanguagesAdapter extends BaseAdapter
                           language.append (parser.getText ());
                       }
 
-                    languages.add (new Language (language.toString (), code));
+                    languages.add (new Language (language.toString (),
+                                                 code));
                   }
               }
             else if (eventType == XmlPullParser.END_DOCUMENT)
@@ -106,11 +111,27 @@ public class LanguagesAdapter extends BaseAdapter
       }
   }
 
+  private Language[] getSelectedLanguages ()
+  {
+    SelectedLanguages selectedLanguages = new SelectedLanguages (context);
+
+    if (selectedLanguages.containsAll ())
+      return allLanguages;
+
+    Vector<Language> languages = new Vector<Language> ();
+
+    for (int i = 0; i < allLanguages.length; i++)
+      if (selectedLanguages.contains (allLanguages[i].getCode ()))
+        languages.add (allLanguages[i]);
+
+    return languages.toArray (new Language[languages.size ()]);
+  }
+
   @Override
   public int getCount ()
   {
     if (filteredLanguages == null)
-      return mainLanguages.length + allLanguages.length + 2;
+      return mainLanguages.length + selectedLanguages.length + 2;
     else
       return filteredLanguages.length + 1;
   }
@@ -133,7 +154,7 @@ public class LanguagesAdapter extends BaseAdapter
         if (position == 0)
           return "ĈIUJ LINGVOJ";
 
-        return allLanguages[position - 1];
+        return selectedLanguages[position - 1];
       }
     else if (position == 0)
       return "ĈIUJ LINGVOJ";
@@ -233,7 +254,7 @@ public class LanguagesAdapter extends BaseAdapter
   public LanguagesFilter getFilter ()
   {
     if (filter == null)
-      filter = new LanguagesFilter ();
+      filter = new LanguagesFilter (selectedLanguages);
 
     return filter;
   }
@@ -265,8 +286,23 @@ public class LanguagesAdapter extends BaseAdapter
     notifyDataSetChanged ();
   }
 
+  public void reload ()
+  {
+    this.selectedLanguages = getSelectedLanguages ();
+    notifyDataSetChanged ();
+  }
+
   private class LanguagesFilter extends Filter
   {
+    private Language[] selectedLanguages;
+
+    public LanguagesFilter (Language[] selectedLanguages)
+    {
+      /* We keep a copy of the languages array so that we don't have
+       * to worry about it being replaced in the main thread */
+      this.selectedLanguages = selectedLanguages;
+    }
+
     @Override
     public FilterResults performFiltering (CharSequence filter)
     {
@@ -282,9 +318,9 @@ public class LanguagesAdapter extends BaseAdapter
           String filterString = Hats.removeHats (filter);
           Vector<Language> result = new Vector<Language> ();
 
-          for (int i = 0; i < allLanguages.length; i++)
+          for (int i = 0; i < selectedLanguages.length; i++)
             {
-              Language language = allLanguages[i];
+              Language language = selectedLanguages[i];
 
               if (language.getName ().startsWith (filterString))
                 result.add (language);
