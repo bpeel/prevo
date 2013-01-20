@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,10 @@
   <item a:id="@+id/menu_zoom"
         a:title="@string/menu_zoom"
         a:icon="@android:drawable/ic_menu_zoom" />
+  <item a:id="@+id/menu_preferences"
+        a:title="@string/menu_preferences"
+        a:icon="@android:drawable/ic_menu_preferences"
+        a:showAsAction="never" />
   <item a:id="@+id/menu_about"
         a:title="@string/menu_about"
         a:icon="@android:drawable/ic_menu_info_details" />

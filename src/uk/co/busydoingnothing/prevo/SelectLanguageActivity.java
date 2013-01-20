@@ -40,6 +40,9 @@ public class SelectLanguageActivity extends ListActivity
   private LanguageDatabaseHelper dbHelper;
   private LanguagesAdapter adapter;
 
+  private boolean stopped;
+  private boolean reloadQueued;
+
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
@@ -51,6 +54,9 @@ public class SelectLanguageActivity extends ListActivity
     setListAdapter (adapter);
 
     dbHelper = new LanguageDatabaseHelper (this);
+
+    stopped = true;
+    reloadQueued = true;
 
     ListView lv = getListView ();
 
@@ -88,6 +94,11 @@ public class SelectLanguageActivity extends ListActivity
             }
         }
       });
+
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            Activity.MODE_PRIVATE);
+    prefs.registerOnSharedPreferenceChangeListener (this);
   }
 
   @Override
@@ -95,16 +106,27 @@ public class SelectLanguageActivity extends ListActivity
   {
     super.onStart ();
 
-    SharedPreferences prefs =
-      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
-    prefs.registerOnSharedPreferenceChangeListener (this);
+    stopped = false;
 
     adapter.setMainLanguages (dbHelper.getLanguages ());
+
+    if (reloadQueued)
+      {
+        adapter.reload ();
+        reloadQueued = false;
+      }
   }
 
   @Override
   public void onStop ()
+  {
+    stopped = true;
+
+    super.onStop ();
+  }
+
+  @Override
+  public void onDestroy ()
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
@@ -112,7 +134,7 @@ public class SelectLanguageActivity extends ListActivity
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
-    super.onStop ();
+    super.onDestroy ();
   }
 
   @Override
@@ -145,6 +167,15 @@ public class SelectLanguageActivity extends ListActivity
                                          String key)
   {
     if (key.equals (SelectedLanguages.PREF))
-      adapter.reload ();
+      {
+        if (stopped)
+          /* Queue the reload for the next time the activity is started */
+          reloadQueued = true;
+        else
+          {
+            adapter.reload ();
+            reloadQueued = false;
+          }
+      }
   }
 }

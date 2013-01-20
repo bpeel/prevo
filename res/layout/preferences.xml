@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,18 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<menu xmlns:a="http://schemas.android.com/apk/res/android">
-  <item a:id="@+id/menu_choose_language"
-        a:title="@string/menu_choose_language" />
-  <item a:id="@+id/menu_search"
-        a:title="@string/menu_search"
-        a:icon="@android:drawable/ic_menu_search"
-        a:showAsAction="ifRoom" />
-  <item a:id="@+id/menu_preferences"
-        a:title="@string/menu_preferences"
-        a:icon="@android:drawable/ic_menu_preferences"
-        a:showAsAction="never" />
-  <item a:id="@+id/menu_about"
-        a:title="@string/menu_about"
-        a:icon="@android:drawable/ic_menu_info_details" />
-</menu>
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+              a:orientation="vertical"
+              a:layout_width="match_parent"
+              a:layout_height="match_parent">
+  <ListView a:id="@android:id/list"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent" />  
+</LinearLayout>

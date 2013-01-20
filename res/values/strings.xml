@@ -21,6 +21,7 @@
   <string name="app_name">PReVo</string>
   <string name="select_language">Elektu lingvon</string>
   <string name="search">Serĉu</string>
+  <string name="preferences">Agordoj</string>
   <string name="no_results">Neniuj vortoj troviĝis</string>
   <string name="type_to_filter">Tajpu ion por serĉi</string>
   <string name="menu_choose_language">Elektu lingvon</string>
@@ -30,9 +31,13 @@
   <string name="menu_create_flashcard_word">Kreu fulmkarton, difino→vorto</string>
   <string name="menu_create_flashcard_definition">Kreu fulmkarton, vorto→difino</string>
   <string name="menu_zoom">Zomu la tekston</string>
+  <string name="menu_preferences">Agordoj</string>
   <string name="no_flashcard">Mankas aplikaĵo kiu povas krei fulmkarton. Eble vi volos instali “Anki”; almenaŭ version 2.0.</string>
   <string name="definition_label">Difino</string>
   <string name="close">Fermu</string>
+  <string name="show_translations">Montritaj tradukoj</string>
+  <string name="show_all_translations">Montru ĉiujn tradukojn</string>
+  <string name="show_no_translations">Montru neniujn tradukojn</string>
   <string name="about_message">
 <b>PReVo @VERSION@</b>\n
 \nCopyright © 2012, 2013 Neil Roberts\n

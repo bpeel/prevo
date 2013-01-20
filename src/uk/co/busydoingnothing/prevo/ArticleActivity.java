@@ -96,6 +96,9 @@ public class ArticleActivity extends Activity
 
   private Handler handler;
 
+  private boolean stopped;
+  private boolean reloadQueued;
+
   private void skipSpannableString (BinaryReader in)
     throws IOException
   {
@@ -375,13 +378,8 @@ public class ArticleActivity extends Activity
   {
     super.onCreate (savedInstanceState);
 
-    loadIntendedArticle ();
-  }
-
-  @Override
-  public void onStart ()
-  {
-    super.onStart ();
+    stopped = true;
+    reloadQueued = true;
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
@@ -393,7 +391,29 @@ public class ArticleActivity extends Activity
   }
 
   @Override
+  public void onStart ()
+  {
+    super.onStart ();
+
+    stopped = false;
+
+    if (reloadQueued)
+      {
+        loadIntendedArticle ();
+        reloadQueued = false;
+      }
+  }
+
+  @Override
   public void onStop ()
+  {
+    stopped = true;
+
+    super.onStop ();
+  }
+
+  @Override
+  public void onDestroy ()
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
@@ -401,7 +421,7 @@ public class ArticleActivity extends Activity
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
-    super.onStop ();
+    super.onDestroy ();
   }
 
   @Override
@@ -639,6 +659,15 @@ public class ArticleActivity extends Activity
     if (key.equals (MenuHelper.PREF_FONT_SIZE))
       setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
     else if (key.equals (SelectedLanguages.PREF))
-      loadIntendedArticle ();
+      {
+        if (stopped)
+          /* Queue the reload for the next time the activity is started */
+          reloadQueued = true;
+        else
+          {
+            loadIntendedArticle ();
+            reloadQueued = false;
+          }
+      }
   }
 }

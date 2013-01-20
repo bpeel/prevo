@@ -161,6 +161,12 @@ public class MenuHelper
     activity.showDialog (DIALOG_ABOUT);
   }
 
+  public static void goPreferences (Activity activity)
+  {
+    Intent intent = new Intent (activity, PreferenceActivity.class);
+    activity.startActivity (intent);
+  }
+
   public static boolean onOptionsItemSelected (Activity activity,
                                                MenuItem item)
   {
@@ -172,6 +178,10 @@ public class MenuHelper
 
       case R.id.menu_search:
         goSearch (activity);
+        return true;
+
+      case R.id.menu_preferences:
+        goPreferences (activity);
         return true;
 
       case R.id.menu_about:

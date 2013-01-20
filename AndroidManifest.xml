@@ -43,5 +43,8 @@
     <activity a:name="SelectLanguageActivity"
               a:label="@string/app_name">
     </activity>
+    <activity a:name="PreferenceActivity"
+              a:label="@string/app_name">
+    </activity>
   </application>
 </manifest>
