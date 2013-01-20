@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -152,7 +152,7 @@ public class MenuHelper
 
   public static void goChooseLanguage (Activity activity)
   {
-    Intent intent = new Intent (activity, LanguagesActivity.class);
+    Intent intent = new Intent (activity, SelectLanguageActivity.class);
     activity.startActivity (intent);
   }
 

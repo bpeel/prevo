@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2013  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,6 +39,9 @@
               a:label="@string/search">
     </activity>
     <activity a:name="ArticleActivity">
+    </activity>
+    <activity a:name="SelectLanguageActivity"
+              a:label="@string/app_name">
     </activity>
   </application>
 </manifest>
