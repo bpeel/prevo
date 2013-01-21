@@ -27,8 +27,6 @@ import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.TextView;
 import java.util.Vector;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 
 public class LanguagesAdapter extends BaseAdapter
   implements Filterable
@@ -38,7 +36,7 @@ public class LanguagesAdapter extends BaseAdapter
     new Language ("esperanto", "eo")
   };
 
-  private Language[] allLanguages;
+  private LanguageList languageList;
   private Language[] selectedLanguages;
 
   private Context context;
@@ -52,68 +50,14 @@ public class LanguagesAdapter extends BaseAdapter
   public LanguagesAdapter (Context context)
   {
     this.context = context;
-    this.allLanguages = getAllLanguages ();
+    this.languageList = LanguageList.getDefault (context);
     this.selectedLanguages = getSelectedLanguages ();
-  }
-
-  private Language[] getAllLanguages ()
-  {
-    try
-      {
-        XmlPullParser parser;
-        StringBuilder language = new StringBuilder ();
-
-        Vector<Language> languages = new Vector<Language> ();
-
-        parser = context.getResources ().getXml (R.xml.languages);
-
-        while (true)
-          {
-            int eventType = parser.getEventType ();
-
-            if (eventType == XmlPullParser.START_TAG)
-              {
-                if (parser.getName ().equals ("lang"))
-                  {
-                    String code = parser.getAttributeValue (null, "code");
-
-                    language.setLength (0);
-
-                    while (true)
-                      {
-                        parser.next ();
-                        eventType = parser.getEventType ();
-                        if (eventType == XmlPullParser.END_TAG)
-                          break;
-                        else if (eventType == XmlPullParser.TEXT)
-                          language.append (parser.getText ());
-                      }
-
-                    languages.add (new Language (language.toString (),
-                                                 code));
-                  }
-              }
-            else if (eventType == XmlPullParser.END_DOCUMENT)
-              break;
-
-            parser.next ();
-          }
-
-        return languages.toArray (new Language[languages.size ()]);
-      }
-    catch (XmlPullParserException e)
-      {
-        throw new IllegalStateException (e);
-      }
-    catch (java.io.IOException e)
-      {
-        throw new IllegalStateException (e);
-      }
   }
 
   private Language[] getSelectedLanguages ()
   {
     SelectedLanguages selectedLanguages = new SelectedLanguages (context);
+    Language[] allLanguages = languageList.getAllLanguages ();
 
     if (selectedLanguages.containsAll ())
       return allLanguages;
@@ -259,15 +203,6 @@ public class LanguagesAdapter extends BaseAdapter
     return filter;
   }
 
-  private String getLanguageName (String languageCode)
-  {
-    for (int i = 0; i < allLanguages.length; i++)
-      if (languageCode.equals (allLanguages[i].getCode ()))
-        return allLanguages[i].getName ();
-
-    return languageCode;
-  }
-
   public void setMainLanguages (String[] languages)
   {
     Language[] mainLanguages = new Language[languages.length + 1];
@@ -277,7 +212,7 @@ public class LanguagesAdapter extends BaseAdapter
 
     for (int i = 0; i < languages.length; i++)
       {
-        String languageName = getLanguageName (languages[i]);
+        String languageName = languageList.getLanguageName (languages[i]);
         mainLanguages[i + 1] = new Language (languageName, languages[i]);
       }
 
