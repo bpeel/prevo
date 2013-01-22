@@ -86,7 +86,7 @@ public class LanguagesAdapter extends BaseAdapter
     if (filteredLanguages == null)
       {
         if (position == 0)
-          return "ĈEFAJ LINGVOJ";
+          return context.getString (R.string.main_languages);
 
         position--;
 
@@ -96,12 +96,12 @@ public class LanguagesAdapter extends BaseAdapter
         position -= mainLanguages.length;
 
         if (position == 0)
-          return "ĈIUJ LINGVOJ";
+          return context.getString (R.string.all_languages);
 
         return selectedLanguages[position - 1];
       }
     else if (position == 0)
-      return "ĈIUJ LINGVOJ";
+      return context.getString (R.string.all_languages);
     else
       return filteredLanguages[position - 1];
   }

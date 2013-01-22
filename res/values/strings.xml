@@ -24,6 +24,8 @@
   <string name="preferences">Agordoj</string>
   <string name="no_results">Neniuj vortoj troviĝis</string>
   <string name="type_to_filter">Tajpu ion por serĉi</string>
+  <string name="main_languages">Ĉefaj lingvoj</string>
+  <string name="all_languages">Ĉiuj lingvoj</string>
   <string name="menu_choose_language">Elektu lingvon</string>
   <string name="menu_search">Serĉu</string>
   <string name="menu_about">Pri</string>
