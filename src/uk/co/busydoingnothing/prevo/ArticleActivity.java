@@ -77,6 +77,7 @@ public class ArticleActivity extends Activity
   private Vector<TextView> definitions;
 
   private DelayedScrollView scrollView;
+  private View articleView;
   private int articleNumber;
 
   private ZoomControls zoomControls;
@@ -323,16 +324,23 @@ public class ArticleActivity extends Activity
 
     if (fontSize != this.fontSize)
       {
-        float fontSizeScale = (float) Math.pow (FONT_SIZE_ROOT,
-                                                fontSize - N_FONT_SIZES / 2);
-        float titleFontSize = titleBaseTextSize * fontSizeScale;
-        float definitionFontSize = definitionBaseTextSize * fontSizeScale;
+        /* There's no point in updating the font size if a reload is
+         * queued because it will just get set back to the default
+         * when it is finally reloaded */
+        if (!reloadQueued)
+          {
+            float fontSizeScale =
+              (float) Math.pow (FONT_SIZE_ROOT,
+                                fontSize - N_FONT_SIZES / 2);
+            float titleFontSize = titleBaseTextSize * fontSizeScale;
+            float definitionFontSize = definitionBaseTextSize * fontSizeScale;
 
-        for (TextView tv : sectionHeaders)
-          tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, titleFontSize);
+            for (TextView tv : sectionHeaders)
+              tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, titleFontSize);
 
-        for (TextView tv : definitions)
-          tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, definitionFontSize);
+            for (TextView tv : definitions)
+              tv.setTextSize (TypedValue.COMPLEX_UNIT_PX, definitionFontSize);
+          }
 
         this.fontSize = fontSize;
 
@@ -344,13 +352,8 @@ public class ArticleActivity extends Activity
   {
     Intent intent = getIntent ();
 
-    setContentView (R.layout.article);
-
-    scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
-    layout = (RelativeLayout) findViewById (R.id.article_layout);
-
-    sectionHeaders = new Vector<TextView> ();
-    definitions = new Vector<TextView> ();
+    sectionHeaders.setSize (0);
+    definitions.setSize (0);
 
     if (intent != null)
       {
@@ -362,7 +365,10 @@ public class ArticleActivity extends Activity
             try
               {
                 this.articleNumber = article;
-                scrollView.addView (loadArticle (article));
+                if (articleView != null)
+                  scrollView.removeView (articleView);
+                articleView = loadArticle (article);
+                scrollView.addView (articleView);
                 showSection (mark);
               }
             catch (IOException e)
@@ -371,12 +377,26 @@ public class ArticleActivity extends Activity
               }
           }
       }
+
+    /* The font size will have been reset to the default so we need to
+     * update it */
+    int oldFontSize = this.fontSize;
+    this.fontSize = N_FONT_SIZES / 2;
+    setFontSize (oldFontSize);
   }
 
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
+
+    setContentView (R.layout.article);
+
+    scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
+    layout = (RelativeLayout) findViewById (R.id.article_layout);
+
+    sectionHeaders = new Vector<TextView> ();
+    definitions = new Vector<TextView> ();
 
     stopped = true;
     reloadQueued = true;
@@ -399,8 +419,8 @@ public class ArticleActivity extends Activity
 
     if (reloadQueued)
       {
-        loadIntendedArticle ();
         reloadQueued = false;
+        loadIntendedArticle ();
       }
   }
 
@@ -665,8 +685,8 @@ public class ArticleActivity extends Activity
           reloadQueued = true;
         else
           {
-            loadIntendedArticle ();
             reloadQueued = false;
+            loadIntendedArticle ();
           }
       }
   }
