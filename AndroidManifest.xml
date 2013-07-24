@@ -19,8 +19,8 @@
 
 <manifest xmlns:a="http://schemas.android.com/apk/res/android"
           package="uk.co.busydoingnothing.prevo"
-          a:versionCode="7"
-          a:versionName="0.7"
+          a:versionCode="8"
+          a:versionName="0.8"
           a:installLocation="auto">
   <uses-sdk a:minSdkVersion="7" a:targetSdkVersion="14" />
 
