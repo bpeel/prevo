@@ -28,9 +28,6 @@ import android.os.Bundle;
 
 public class StartActivity extends Activity
 {
-  private LanguageDatabaseHelper dbHelper;
-  private LanguagesAdapter adapter;
-
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
