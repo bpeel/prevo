@@ -21,7 +21,7 @@ This git repo does not include the assets containing the dictionary
 data. These must be separately built from the dictionary's XML data
 using a program called prevodb, which is available here:
 
- git://git.busydoingnothing.co.uk/prevodb.git
+ https://github.com/bpeel/prevodb/
 
 The dictionary data is available from the website for the Reta Vortaro
 here:
@@ -34,7 +34,7 @@ dosieroj’ and extract that on top of the XML sources to get the latest
 updates. Alternatively you can you use my git clone of the data which
 contains the exact data I use to make releases:
 
- git://git.busydoingnothing.co.uk/revo.git
+ https://github.com/bpeel/revo
 
 You can build prevodb with the usual automake commands:
 
