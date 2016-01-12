@@ -125,8 +125,6 @@ public class SearchActivity extends ListActivity
 
     inflater.inflate (R.menu.search_menu, menu);
 
-    menu.removeItem (R.id.menu_search);
-
     return true;
   }
 

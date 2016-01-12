@@ -20,10 +20,6 @@
 <menu xmlns:a="http://schemas.android.com/apk/res/android">
   <item a:id="@+id/menu_choose_language"
         a:title="@string/menu_choose_language" />
-  <item a:id="@+id/menu_search"
-        a:title="@string/menu_search"
-        a:icon="@android:drawable/ic_menu_search"
-        a:showAsAction="ifRoom" />
   <item a:id="@+id/menu_preferences"
         a:title="@string/menu_preferences"
         a:icon="@android:drawable/ic_menu_preferences"
