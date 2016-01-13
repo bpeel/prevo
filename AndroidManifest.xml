@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2015  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
 
 <manifest xmlns:a="http://schemas.android.com/apk/res/android"
           package="uk.co.busydoingnothing.prevo"
-          a:versionCode="11"
-          a:versionName="0.11"
+          a:versionCode="12"
+          a:versionName="0.12"
           a:installLocation="auto">
   <uses-sdk a:minSdkVersion="7" a:targetSdkVersion="14" />
 
