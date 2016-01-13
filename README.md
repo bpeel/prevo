@@ -15,7 +15,7 @@ It is also available in the Google play store here:
  https://play.google.com/store/apps/details?id=uk.co.busydoingnothing.prevo
 
 Building
-========
+--------
 
 This git repo does not include the assets containing the dictionary
 data. These must be separately built from the dictionary's XML data
@@ -38,18 +38,18 @@ contains the exact data I use to make releases:
 
 You can build prevodb with the usual automake commands:
 
- ./autogen.sh
- make -j4
+    ./autogen.sh
+    make -j4
 
 Note that it will need the developer packages for expat and glib in
 order to build.
 
-Now assuming you have the source for ReVo in $HOME/revo, prevodb in
-$HOME/prevodb and PReVo in $HOME/prevo, you can use the following
+Now assuming you have the source for ReVo in `$HOME/revo`, prevodb in
+`$HOME/prevodb` and PReVo in `$HOME/prevo`, you can use the following
 command to build the database and put it in the right location to
 build the application:
 
- $HOME/prevodb/src/prevodb -i $HOME/revo -o $HOME/prevo-android
+    $HOME/prevodb/src/prevodb -i $HOME/revo -o $HOME/prevo
 
 You will likely see some warnings about inconsistencies in the XML
 sources. It is safe to ignore these.
@@ -57,14 +57,14 @@ sources. It is safe to ignore these.
 Assuming you have the Android SDK installed correctly, you can now
 build the package like so:
 
- cd $HOME/prevo-android
- android update project -t android-16 -p $PWD
- ant release
+    cd $HOME/prevo
+    android update project -t android-16 -p $PWD
+    ant release
 
-You should then have the final package in bin/PReVo-release.apk
+You should then have the final package in `bin/PReVo-release.apk`
 
 Building a specific release
-===========================
+---------------------------
 
 The releases are all tagged and signed in the git repo using the
 following public key:
@@ -76,4 +76,4 @@ sources and the prevodb program. This information can be used to build
 a copy of a release using exactly the same data. You can see this
 information for example with:
 
- git show 0.8
+    git show 0.12
