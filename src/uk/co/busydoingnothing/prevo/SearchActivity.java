@@ -135,11 +135,21 @@ public class SearchActivity extends ListActivity
   private void addLanguageMenuItem (Menu menu,
                                     String language)
   {
-    LanguageList languageList = LanguageList.getDefault (this);
-    String languageName = languageList.getLanguageName (language);
     Resources resources = getResources ();
-    String label = resources.getString (R.string.menu_search_language,
-                                        languageName);
+    String label;
+
+    if (language.equals ("eo"))
+      {
+        label = resources.getString (R.string.menu_search_language_esperanto);
+      }
+    else
+      {
+        LanguageList languageList = LanguageList.getDefault (this);
+        String languageName = languageList.getLanguageName (language);
+        label = resources.getString (R.string.menu_search_language,
+                                     languageName);
+      }
+
     MenuItem item = menu.add (label);
     item.setIntent (MenuHelper.createSearchIntent (this, language));
   }
