@@ -138,15 +138,24 @@ public class MenuHelper
     return dialog;
   }
 
-  public static void goSearch (Activity activity)
+  public static Intent createSearchIntent (Activity activity,
+                                           String language)
   {
     Intent intent = new Intent (activity, SearchActivity.class);
+
+    intent.putExtra (SearchActivity.EXTRA_LANGUAGE, language);
+
+    return intent;
+  }
+
+  public static void goSearch (Activity activity)
+  {
     SharedPreferences prefs =
       activity.getSharedPreferences (PREVO_PREFERENCES,
                                      Activity.MODE_PRIVATE);
+    String defaultLanguage = prefs.getString (PREF_LAST_LANGUAGE, "eo");
+    Intent intent = createSearchIntent (activity, defaultLanguage);
 
-    intent.putExtra (SearchActivity.EXTRA_LANGUAGE,
-                     prefs.getString (PREF_LAST_LANGUAGE, "eo"));
     activity.startActivity (intent);
   }
 
