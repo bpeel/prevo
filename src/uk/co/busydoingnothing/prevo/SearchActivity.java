@@ -20,6 +20,7 @@ package uk.co.busydoingnothing.prevo;
 import android.app.Dialog;
 import android.app.ListActivity;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -40,6 +41,7 @@ public class SearchActivity extends ListActivity
     "uk.co.busydoingnothing.prevo.Language";
 
   private SearchAdapter searchAdapter;
+  private String searchLanguage;
 
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -53,14 +55,16 @@ public class SearchActivity extends ListActivity
 
     if (intent != null)
       {
-        String language = intent.getStringExtra (EXTRA_LANGUAGE);
+        searchLanguage = intent.getStringExtra (EXTRA_LANGUAGE);
 
-        if (language != null)
+        if (searchLanguage != null)
           {
             try
               {
                 InputStream indexIn =
-                  getAssets ().open ("indices/index-" + language + ".bin");
+                  getAssets ().open ("indices/index-" +
+                                     searchLanguage +
+                                     ".bin");
                 Trie trie = new Trie (indexIn);
                 searchAdapter = new SearchAdapter (this, trie);
 
@@ -69,7 +73,7 @@ public class SearchActivity extends ListActivity
                 TextView tv = (TextView) findViewById (R.id.search_edit);
                 tv.addTextChangedListener (this);
 
-                setTitle (getTitle () + " [" + language + "]");
+                setTitle (getTitle () + " [" + searchLanguage + "]");
               }
             catch (java.io.IOException e)
               {
@@ -118,11 +122,46 @@ public class SearchActivity extends ListActivity
                          null /* resultReceiver */);
   }
 
+  private void addLanguageMenuItem (Menu menu,
+                                    String language)
+  {
+    LanguageList languageList = LanguageList.getDefault (this);
+    String languageName = languageList.getLanguageName (language);
+    Resources resources = getResources ();
+    String label = resources.getString (R.string.menu_search_language,
+                                        languageName);
+    MenuItem item = menu.add (label);
+    item.setIntent (MenuHelper.createSearchIntent (this, language));
+  }
+
   @Override
   public boolean onCreateOptionsMenu (Menu menu)
   {
-    MenuInflater inflater = getMenuInflater ();
+    LanguageDatabaseHelper dbHelper = new LanguageDatabaseHelper (this);
+    String[] languages = dbHelper.getLanguages ();
+    int nLanguages;
 
+    if (searchLanguage.equals ("eo"))
+      {
+        nLanguages = 2;
+      }
+    else
+      {
+        addLanguageMenuItem (menu, "eo");
+        nLanguages = 1;
+      }
+
+    for (String language : languages)
+      {
+        if (searchLanguage == null || !language.equals (searchLanguage))
+          {
+            addLanguageMenuItem (menu, language);
+            if (--nLanguages <= 0)
+              break;
+          }
+      }
+
+    MenuInflater inflater = getMenuInflater ();
     inflater.inflate (R.menu.search_menu, menu);
 
     return true;
