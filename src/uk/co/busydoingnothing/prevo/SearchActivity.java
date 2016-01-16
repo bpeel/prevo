@@ -39,6 +39,8 @@ public class SearchActivity extends ListActivity
 {
   public static final String EXTRA_LANGUAGE =
     "uk.co.busydoingnothing.prevo.Language";
+  public static final String EXTRA_SEARCH_TERM =
+    "uk.co.busydoingnothing.prevo.SearchTerm";
 
   private SearchAdapter searchAdapter;
   private String searchLanguage;
@@ -80,6 +82,14 @@ public class SearchActivity extends ListActivity
                 throw new IllegalStateException ("Error while loading " +
                                                  "an asset");
               }
+          }
+
+        String searchTerm = intent.getStringExtra (EXTRA_SEARCH_TERM);
+
+        if (searchTerm != null)
+          {
+            TextView tv = (TextView) findViewById (R.id.search_edit);
+            tv.setText (searchTerm);
           }
       }
 
