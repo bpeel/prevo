@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,6 +34,8 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public class SearchActivity extends ListActivity
   implements TextWatcher
@@ -42,14 +45,22 @@ public class SearchActivity extends ListActivity
   public static final String EXTRA_SEARCH_TERM =
     "uk.co.busydoingnothing.prevo.SearchTerm";
 
+  public static final String TAG = "prevosearch";
+
   private SearchAdapter searchAdapter;
   private String searchLanguage;
+
+  private static boolean actionInitialised;
+  private static boolean actionSupported;
+  private static Method setShowAsActionMethod;
 
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
     super.onCreate (savedInstanceState);
     setContentView (R.layout.search);
+
+    ensureActionInitialised ();
 
     Intent intent = getIntent ();
 
@@ -152,6 +163,23 @@ public class SearchActivity extends ListActivity
 
     MenuItem item = menu.add (label);
     item.setIntent (MenuHelper.createSearchIntent (this, language));
+
+    if (actionSupported)
+      {
+        try
+          {
+            setShowAsActionMethod.invoke (item,
+                                          MenuItem.SHOW_AS_ACTION_IF_ROOM |
+                                          MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+            item.setTitleCondensed (language);
+          }
+        catch (IllegalAccessException e)
+          {
+          }
+        catch (InvocationTargetException e)
+          {
+          }
+      }
   }
 
   @Override
@@ -232,5 +260,25 @@ public class SearchActivity extends ListActivity
                              int before,
                              int count)
   {
+  }
+
+  private static void ensureActionInitialised ()
+  {
+    if (actionInitialised)
+      return;
+
+    try
+      {
+        setShowAsActionMethod =
+          MenuItem.class.getMethod ("setShowAsAction", int.class);
+
+        actionSupported = true;
+      }
+    catch (NoSuchMethodException e)
+      {
+        Log.i (TAG, "Action not supported: " + e.getMessage ());
+      }
+
+    actionInitialised = true;
   }
 }
