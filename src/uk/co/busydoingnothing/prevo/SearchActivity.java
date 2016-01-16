@@ -180,6 +180,16 @@ public class SearchActivity extends ListActivity
   @Override
   public boolean onOptionsItemSelected (MenuItem item)
   {
+    Intent intent = item.getIntent ();
+
+    if (intent != null &&
+        intent.getComponent () != null &&
+        intent.getComponent ().equals (getComponentName ()))
+      {
+            TextView tv = (TextView) findViewById (R.id.search_edit);
+            intent.putExtra (EXTRA_SEARCH_TERM, tv.getText ().toString ());
+      }
+
     if (MenuHelper.onOptionsItemSelected (this, item))
       return true;
 
