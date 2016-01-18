@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -138,31 +138,31 @@ public class MenuHelper
     return dialog;
   }
 
-  public static Intent createSearchIntent (Activity activity,
+  public static Intent createSearchIntent (Context context,
                                            String language)
   {
-    Intent intent = new Intent (activity, SearchActivity.class);
+    Intent intent = new Intent (context, SearchActivity.class);
 
     intent.putExtra (SearchActivity.EXTRA_LANGUAGE, language);
 
     return intent;
   }
 
-  public static void goSearch (Activity activity)
+  public static void goSearch (Context context)
   {
     SharedPreferences prefs =
-      activity.getSharedPreferences (PREVO_PREFERENCES,
-                                     Activity.MODE_PRIVATE);
+      context.getSharedPreferences (PREVO_PREFERENCES,
+                                    Context.MODE_PRIVATE);
     String defaultLanguage = prefs.getString (PREF_LAST_LANGUAGE, "eo");
-    Intent intent = createSearchIntent (activity, defaultLanguage);
+    Intent intent = createSearchIntent (context, defaultLanguage);
 
-    activity.startActivity (intent);
+    context.startActivity (intent);
   }
 
-  public static void goChooseLanguage (Activity activity)
+  public static void goChooseLanguage (Context context)
   {
-    Intent intent = new Intent (activity, SelectLanguageActivity.class);
-    activity.startActivity (intent);
+    Intent intent = new Intent (context, SelectLanguageActivity.class);
+    context.startActivity (intent);
   }
 
   public static void showAbout (Activity activity)
@@ -170,10 +170,10 @@ public class MenuHelper
     activity.showDialog (DIALOG_ABOUT);
   }
 
-  public static void goPreferences (Activity activity)
+  public static void goPreferences (Context context)
   {
-    Intent intent = new Intent (activity, PreferenceActivity.class);
-    activity.startActivity (intent);
+    Intent intent = new Intent (context, PreferenceActivity.class);
+    context.startActivity (intent);
   }
 
   public static boolean onOptionsItemSelected (Activity activity,
