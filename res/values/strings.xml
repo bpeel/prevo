@@ -23,6 +23,7 @@
   <string name="search">Serĉu</string>
   <string name="preferences">Agordoj</string>
   <string name="no_results">Neniuj vortoj troviĝis</string>
+  <string name="other_language_note">Neniuj vortoj troviĝis en %1$s, jen vortoj en %2$s</string>
   <string name="type_to_filter">Tajpu ion por serĉi</string>
   <string name="main_languages">Ĉefaj lingvoj</string>
   <string name="all_languages">Ĉiuj lingvoj</string>

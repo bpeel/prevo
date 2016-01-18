@@ -18,6 +18,7 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,6 +42,7 @@ public class SearchAdapter extends BaseAdapter
   private Context context;
   private SearchFilter filter;
 
+  private SearchResult noteResult;
   private SearchResult[] results;
   private int languageNum;
   private int numResults = 0;
@@ -61,6 +63,24 @@ public class SearchAdapter extends BaseAdapter
     results = resultData.results;
     languageNum = resultData.languageNum;
     numResults = resultData.count;
+
+    if (languageNum > 0)
+      {
+        LanguageList languageList = LanguageList.getDefault (context);
+        String mainLanguage =
+          languageList.getLanguageName (languages[0],
+                                        true /* with article */);
+        String otherLanguage =
+          languageList.getLanguageName (languages[languageNum],
+                                        true /* with article */);
+        Resources resources = context.getResources ();
+        String note = resources.getString (R.string.other_language_note,
+                                           mainLanguage,
+                                           otherLanguage);
+        noteResult = new SearchResult (note,
+                                       Integer.MAX_VALUE,
+                                       Integer.MAX_VALUE);
+      }
   }
 
   private SearchResultData doSearch(String filterString)
@@ -99,12 +119,23 @@ public class SearchAdapter extends BaseAdapter
   @Override
   public int getCount ()
   {
-    return numResults;
+    if (languageNum > 0)
+      return numResults + 1;
+    else
+      return numResults;
   }
 
   @Override
   public SearchResult getItem (int position)
   {
+    if (languageNum > 0)
+      {
+        if (position == 0)
+          return noteResult;
+
+        position--;
+      }
+
     return results[position];
   }
 
@@ -118,13 +149,16 @@ public class SearchAdapter extends BaseAdapter
   @Override
   public int getItemViewType (int position)
   {
-    return 0;
+    if (languageNum == 0 || position > 0)
+      return 1;
+    else
+      return 0;
   }
 
   @Override
   public int getViewTypeCount ()
   {
-    return 1;
+    return 2;
   }
 
   @Override
@@ -135,7 +169,11 @@ public class SearchAdapter extends BaseAdapter
     if (convertView == null)
       {
         LayoutInflater layoutInflater = LayoutInflater.from (context);
-        int id = android.R.layout.simple_list_item_1;
+        int id;
+        if (languageNum == 0 || position > 0)
+          id = android.R.layout.simple_list_item_1;
+        else
+          id = R.layout.search_note;
         tv = (TextView) layoutInflater.inflate (id, parent, false);
       }
     else
@@ -161,13 +199,16 @@ public class SearchAdapter extends BaseAdapter
   @Override
   public boolean isEnabled (int position)
   {
-    return true;
+    /* If a language other than the primary one was used to return
+     * results then the first item will be a note explaining it and it
+     * shouldn't be enabled. */
+    return languageNum == 0 || position > 0;
   }
 
   @Override
   public boolean areAllItemsEnabled ()
   {
-    return true;
+    return false;
   }
 
   @Override
