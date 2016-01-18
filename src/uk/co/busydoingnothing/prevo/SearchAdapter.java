@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,16 +37,32 @@ public class SearchAdapter extends BaseAdapter
   private SearchResult[] results;
   private int numResults = 0;
 
-  private Trie trie;
+  private String language;
 
   public SearchAdapter (Context context,
-                        Trie trie)
+                        String language)
   {
     this.context = context;
-    this.trie = trie;
+    this.language = language;
 
     results = new SearchResult[MAX_RESULTS];
-    numResults = trie.search ("", results);
+    numResults = doSearch ("", results);
+  }
+
+  private int doSearch(String filterString,
+                       SearchResult[] results)
+  {
+    try
+      {
+        Trie trie = TrieCache.getTrie (context, language);
+
+        return trie.search (filterString, results);
+      }
+    catch (java.io.IOException e)
+      {
+        throw new IllegalStateException ("Error while loading " +
+                                         "an asset");
+      }
   }
 
   @Override
@@ -142,7 +158,7 @@ public class SearchAdapter extends BaseAdapter
       SearchResult[] results = new SearchResult[MAX_RESULTS];
 
       ret.values = results;
-      ret.count = trie.search (filterString, results);
+      ret.count = doSearch (filterString, results);
 
       return ret;
     }

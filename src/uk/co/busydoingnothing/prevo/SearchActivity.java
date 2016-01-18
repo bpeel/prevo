@@ -71,23 +71,14 @@ public class SearchActivity extends ListActivity
 
         if (searchLanguage != null)
           {
-            try
-              {
-                Trie trie = TrieCache.getTrie (this, searchLanguage);
-                searchAdapter = new SearchAdapter (this, trie);
+            searchAdapter = new SearchAdapter (this, searchLanguage);
 
-                lv.setAdapter (searchAdapter);
+            lv.setAdapter (searchAdapter);
 
-                TextView tv = (TextView) findViewById (R.id.search_edit);
-                tv.addTextChangedListener (this);
+            TextView tv = (TextView) findViewById (R.id.search_edit);
+            tv.addTextChangedListener (this);
 
-                setTitle (getTitle () + " [" + searchLanguage + "]");
-              }
-            catch (java.io.IOException e)
-              {
-                throw new IllegalStateException ("Error while loading " +
-                                                 "an asset");
-              }
+            setTitle (getTitle () + " [" + searchLanguage + "]");
           }
 
         String searchTerm = intent.getStringExtra (EXTRA_SEARCH_TERM);
