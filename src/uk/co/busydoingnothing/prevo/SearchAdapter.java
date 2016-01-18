@@ -26,6 +26,13 @@ import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.TextView;
 
+class SearchResultData
+{
+  public SearchResult[] results;
+  public int count;
+  public int languageNum;
+}
+
 public class SearchAdapter extends BaseAdapter
   implements Filterable
 {
@@ -35,6 +42,7 @@ public class SearchAdapter extends BaseAdapter
   private SearchFilter filter;
 
   private SearchResult[] results;
+  private int languageNum;
   private int numResults = 0;
 
   private String[] languages;
@@ -45,25 +53,41 @@ public class SearchAdapter extends BaseAdapter
     this.context = context;
     this.languages = languages;
 
-    results = new SearchResult[MAX_RESULTS];
-    numResults = doSearch ("", results);
+    setResultData (doSearch (""));
   }
 
-  private int doSearch(String filterString,
-                       SearchResult[] results)
+  private void setResultData (SearchResultData resultData)
   {
+    results = resultData.results;
+    languageNum = resultData.languageNum;
+    numResults = resultData.count;
+  }
+
+  private SearchResultData doSearch(String filterString)
+  {
+    SearchResultData resultData = new SearchResultData ();
+
+    resultData.results = new SearchResult[MAX_RESULTS];
+
     try
       {
-        for (String language : languages)
+        for (int i = 0; i < languages.length; i++)
           {
+            String language = languages[i];
             Trie trie = TrieCache.getTrie (context, language);
-            int numResults = trie.search (filterString, results);
+            int numResults = trie.search (filterString, resultData.results);
 
             if (numResults > 0)
-              return numResults;
+              {
+                resultData.count = numResults;
+                resultData.languageNum = i;
+                return resultData;
+              }
           }
 
-        return 0;
+        resultData.languageNum = 0;
+        resultData.count = 0;
+        return resultData;
       }
     catch (java.io.IOException e)
       {
@@ -162,10 +186,10 @@ public class SearchAdapter extends BaseAdapter
     {
       FilterResults ret = new FilterResults ();
       String filterString = Hats.removeHats (filter).toLowerCase ();
-      SearchResult[] results = new SearchResult[MAX_RESULTS];
+      SearchResultData resultData = doSearch (filterString);
 
-      ret.values = results;
-      ret.count = doSearch (filterString, results);
+      ret.count = resultData.count;
+      ret.values = resultData;
 
       return ret;
     }
@@ -173,8 +197,8 @@ public class SearchAdapter extends BaseAdapter
     @Override
     public void publishResults (CharSequence filter, FilterResults res)
     {
-      results = (SearchResult[]) res.values;
-      numResults = res.count;
+      setResultData ((SearchResultData) res.values);
+
       if (res.count > 0)
         notifyDataSetChanged();
       else
