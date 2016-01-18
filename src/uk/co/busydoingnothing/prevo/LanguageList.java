@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -108,13 +108,30 @@ public class LanguageList
     return languagesByName;
   }
 
-  public String getLanguageName (String languageCode)
+  public String getLanguageName (String languageCode,
+                                 boolean withArticle)
   {
+    if (languageCode.equals ("eo"))
+      return "esperanto";
+
     int lang = Arrays.binarySearch (languagesByCode,
                                     new Language ("", languageCode),
                                     codeComparator);
 
-    return lang < 0 ? languageCode : languagesByCode[lang].getName ();
+    if (lang < 0)
+      return languageCode;
+
+    String name = languagesByCode[lang].getName ();
+
+    if (withArticle)
+      return "la " + name;
+    else
+      return name;
+  }
+
+  public String getLanguageName (String languageCode)
+  {
+    return getLanguageName (languageCode, false);
   }
 
   private static class LanguageCodeComparator implements Comparator<Language>
