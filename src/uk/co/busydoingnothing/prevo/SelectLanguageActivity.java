@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,10 +76,9 @@ public class SelectLanguageActivity extends ListActivity
           if (item instanceof Language)
             {
               Language lang = (Language) item;
-              Intent intent = new Intent (view.getContext (),
-                                          SearchActivity.class);
-              intent.putExtra (SearchActivity.EXTRA_LANGUAGE,
-                               lang.getCode ());
+              Intent intent =
+                MenuHelper.createSearchIntent (parent.getContext (),
+                                               lang.getCode ());
 
               dbHelper.useLanguage (lang.getCode ());
 
