@@ -33,7 +33,6 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -74,11 +73,7 @@ public class SearchActivity extends ListActivity
           {
             try
               {
-                InputStream indexIn =
-                  getAssets ().open ("indices/index-" +
-                                     searchLanguage +
-                                     ".bin");
-                Trie trie = new Trie (indexIn);
+                Trie trie = TrieCache.getTrie (this, searchLanguage);
                 searchAdapter = new SearchAdapter (this, trie);
 
                 lv.setAdapter (searchAdapter);
