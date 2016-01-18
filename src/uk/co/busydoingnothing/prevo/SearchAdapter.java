@@ -37,13 +37,13 @@ public class SearchAdapter extends BaseAdapter
   private SearchResult[] results;
   private int numResults = 0;
 
-  private String language;
+  private String[] languages;
 
   public SearchAdapter (Context context,
-                        String language)
+                        String[] languages)
   {
     this.context = context;
-    this.language = language;
+    this.languages = languages;
 
     results = new SearchResult[MAX_RESULTS];
     numResults = doSearch ("", results);
@@ -54,9 +54,16 @@ public class SearchAdapter extends BaseAdapter
   {
     try
       {
-        Trie trie = TrieCache.getTrie (context, language);
+        for (String language : languages)
+          {
+            Trie trie = TrieCache.getTrie (context, language);
+            int numResults = trie.search (filterString, results);
 
-        return trie.search (filterString, results);
+            if (numResults > 0)
+              return numResults;
+          }
+
+        return 0;
       }
     catch (java.io.IOException e)
       {

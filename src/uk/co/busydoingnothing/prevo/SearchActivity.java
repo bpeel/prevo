@@ -35,6 +35,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Vector;
 
 public class SearchActivity extends ListActivity
   implements TextWatcher
@@ -47,7 +48,7 @@ public class SearchActivity extends ListActivity
   public static final String TAG = "prevosearch";
 
   private SearchAdapter searchAdapter;
-  private String searchLanguage;
+  private String[] searchLanguages;
 
   private static boolean actionInitialised;
   private static boolean actionSupported;
@@ -60,34 +61,26 @@ public class SearchActivity extends ListActivity
     setContentView (R.layout.search);
 
     ensureActionInitialised ();
+    updateSearchLanguages ();
 
-    Intent intent = getIntent ();
+    TextView tv = (TextView) findViewById (R.id.search_edit);
+    tv.addTextChangedListener (this);
+
+    if (searchLanguages.length > 0)
+      setTitle (getTitle () + " [" + searchLanguages[0] + "]");
+
+    searchAdapter = new SearchAdapter (this, searchLanguages);
 
     ListView lv = getListView ();
+    lv.setAdapter (searchAdapter);
 
+    Intent intent = getIntent ();
     if (intent != null)
       {
-        searchLanguage = intent.getStringExtra (EXTRA_LANGUAGE);
-
-        if (searchLanguage != null)
-          {
-            searchAdapter = new SearchAdapter (this, searchLanguage);
-
-            lv.setAdapter (searchAdapter);
-
-            TextView tv = (TextView) findViewById (R.id.search_edit);
-            tv.addTextChangedListener (this);
-
-            setTitle (getTitle () + " [" + searchLanguage + "]");
-          }
-
         String searchTerm = intent.getStringExtra (EXTRA_SEARCH_TERM);
 
         if (searchTerm != null)
-          {
-            TextView tv = (TextView) findViewById (R.id.search_edit);
-            tv.setText (searchTerm);
-          }
+          tv.setText (searchTerm);
       }
 
     lv.setOnItemClickListener (new AdapterView.OnItemClickListener ()
@@ -109,6 +102,38 @@ public class SearchActivity extends ListActivity
           startActivity (intent);
         }
       });
+  }
+
+  private void updateSearchLanguages ()
+  {
+    Vector<String> searchLanguagesVector = new Vector<String> ();
+    String mainLanguage = null;
+    Intent intent = getIntent ();
+
+    if (intent != null)
+      {
+        mainLanguage = intent.getStringExtra (EXTRA_LANGUAGE);
+
+        if (mainLanguage != null)
+          searchLanguagesVector.add (mainLanguage);
+      }
+
+    if (mainLanguage == null || !mainLanguage.equals ("eo"))
+      searchLanguagesVector.add ("eo");
+
+    LanguageDatabaseHelper dbHelper = new LanguageDatabaseHelper (this);
+    for (String language : dbHelper.getLanguages ())
+      {
+        if (mainLanguage == null || !mainLanguage.equals (language))
+          {
+            searchLanguagesVector.add (language);
+            if (searchLanguagesVector.size () >= 3)
+              break;
+          }
+      }
+
+    searchLanguages = new String[searchLanguagesVector.size ()];
+    searchLanguages = searchLanguagesVector.toArray (searchLanguages);
   }
 
   @Override
@@ -171,29 +196,10 @@ public class SearchActivity extends ListActivity
   @Override
   public boolean onCreateOptionsMenu (Menu menu)
   {
-    LanguageDatabaseHelper dbHelper = new LanguageDatabaseHelper (this);
-    String[] languages = dbHelper.getLanguages ();
-    int nLanguages;
+    int i;
 
-    if (searchLanguage.equals ("eo"))
-      {
-        nLanguages = 2;
-      }
-    else
-      {
-        addLanguageMenuItem (menu, "eo");
-        nLanguages = 1;
-      }
-
-    for (String language : languages)
-      {
-        if (searchLanguage == null || !language.equals (searchLanguage))
-          {
-            addLanguageMenuItem (menu, language);
-            if (--nLanguages <= 0)
-              break;
-          }
-      }
+    for (i = 1; i < searchLanguages.length; i++)
+      addLanguageMenuItem (menu, searchLanguages[i]);
 
     MenuInflater inflater = getMenuInflater ();
     inflater.inflate (R.menu.search_menu, menu);
