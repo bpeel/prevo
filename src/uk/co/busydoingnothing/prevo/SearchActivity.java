@@ -45,6 +45,8 @@ public class SearchActivity extends ListActivity
     "uk.co.busydoingnothing.prevo.Language";
   public static final String EXTRA_SEARCH_TERM =
     "uk.co.busydoingnothing.prevo.SearchTerm";
+  public static final String EXTRA_USE_LANGUAGE =
+    "uk.co.busydoingnothing.prevo.UseLanguage";
 
   public static final String TAG = "prevosearch";
 
@@ -114,6 +116,13 @@ public class SearchActivity extends ListActivity
   private void useLanguage ()
   {
     if (searchLanguages.length <= 0)
+      return;
+
+    Intent intent = getIntent ();
+    if (intent == null)
+      return;
+
+    if (!intent.getBooleanExtra (EXTRA_USE_LANGUAGE, false))
       return;
 
     dbHelper.useLanguage (searchLanguages[0]);

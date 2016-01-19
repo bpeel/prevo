@@ -144,6 +144,7 @@ public class MenuHelper
     Intent intent = new Intent (context, SearchActivity.class);
 
     intent.putExtra (SearchActivity.EXTRA_LANGUAGE, language);
+    intent.putExtra (SearchActivity.EXTRA_USE_LANGUAGE, true);
 
     return intent;
   }
@@ -154,7 +155,8 @@ public class MenuHelper
       context.getSharedPreferences (PREVO_PREFERENCES,
                                     Context.MODE_PRIVATE);
     String defaultLanguage = prefs.getString (PREF_LAST_LANGUAGE, "eo");
-    Intent intent = createSearchIntent (context, defaultLanguage);
+    Intent intent = new Intent (context, SearchActivity.class);
+    intent.putExtra (SearchActivity.EXTRA_LANGUAGE, defaultLanguage);
 
     context.startActivity (intent);
   }
