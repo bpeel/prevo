@@ -80,15 +80,6 @@ public class SelectLanguageActivity extends ListActivity
                 MenuHelper.createSearchIntent (parent.getContext (),
                                                lang.getCode ());
 
-              dbHelper.useLanguage (lang.getCode ());
-
-              SharedPreferences prefs =
-                getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                                      MODE_PRIVATE);
-              SharedPreferences.Editor editor = prefs.edit ();
-              editor.putString (MenuHelper.PREF_LAST_LANGUAGE, lang.getCode ());
-              editor.commit ();
-
               startActivity (intent);
             }
         }

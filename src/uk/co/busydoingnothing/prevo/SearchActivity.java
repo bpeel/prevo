@@ -20,6 +20,7 @@ package uk.co.busydoingnothing.prevo;
 import android.app.Dialog;
 import android.app.ListActivity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.text.Editable;
@@ -54,6 +55,8 @@ public class SearchActivity extends ListActivity
   private static boolean actionSupported;
   private static Method setShowAsActionMethod;
 
+  private LanguageDatabaseHelper dbHelper;
+
   @Override
   public void onCreate (Bundle savedInstanceState)
   {
@@ -61,7 +64,11 @@ public class SearchActivity extends ListActivity
     setContentView (R.layout.search);
 
     ensureActionInitialised ();
+
+    dbHelper = new LanguageDatabaseHelper (this);
+
     updateSearchLanguages ();
+    useLanguage ();
 
     TextView tv = (TextView) findViewById (R.id.search_edit);
     tv.addTextChangedListener (this);
@@ -104,6 +111,21 @@ public class SearchActivity extends ListActivity
       });
   }
 
+  private void useLanguage ()
+  {
+    if (searchLanguages.length <= 0)
+      return;
+
+    dbHelper.useLanguage (searchLanguages[0]);
+
+    SharedPreferences prefs =
+      getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
+                            MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit ();
+    editor.putString (MenuHelper.PREF_LAST_LANGUAGE, searchLanguages[0]);
+    editor.commit ();
+  }
+
   private void updateSearchLanguages ()
   {
     Vector<String> searchLanguagesVector = new Vector<String> ();
@@ -121,7 +143,6 @@ public class SearchActivity extends ListActivity
     if (mainLanguage == null || !mainLanguage.equals ("eo"))
       searchLanguagesVector.add ("eo");
 
-    LanguageDatabaseHelper dbHelper = new LanguageDatabaseHelper (this);
     for (String language : dbHelper.getLanguages ())
       {
         if (mainLanguage == null || !mainLanguage.equals (language))
