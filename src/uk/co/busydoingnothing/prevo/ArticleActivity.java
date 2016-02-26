@@ -17,8 +17,8 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
-import android.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -53,7 +53,7 @@ import java.io.IOException;
 import java.util.Vector;
 import java.util.Locale;
 
-public class ArticleActivity extends Activity
+public class ArticleActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   public static final String EXTRA_ARTICLE_NUMBER =
@@ -403,7 +403,7 @@ public class ArticleActivity extends Activity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
 
@@ -437,7 +437,7 @@ public class ArticleActivity extends Activity
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
@@ -465,7 +465,7 @@ public class ArticleActivity extends Activity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
     SharedPreferences.Editor editor = prefs.edit ();
     editor.putInt (MenuHelper.PREF_FONT_SIZE, fontSize);
     editor.commit ();

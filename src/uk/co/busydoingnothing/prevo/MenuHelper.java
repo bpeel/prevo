@@ -17,8 +17,8 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
-import android.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -86,21 +86,21 @@ public class MenuHelper
     context.startActivity (intent);
   }
 
-  public static boolean onOptionsItemSelected (Activity activity,
+  public static boolean onOptionsItemSelected (Context context,
                                                MenuItem item)
   {
     switch (item.getItemId ())
       {
       case R.id.menu_choose_language:
-        goChooseLanguage (activity);
+        goChooseLanguage (context);
         return true;
 
       case R.id.menu_search:
-        goSearch (activity);
+        goSearch (context);
         return true;
 
       case R.id.menu_preferences:
-        goPreferences (activity);
+        goPreferences (context);
         return true;
       }
 

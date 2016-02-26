@@ -22,8 +22,8 @@ android {
     buildToolsVersion "23.0.1"
 
     defaultConfig {
-        minSdkVersion 7
-        targetSdkVersion 14
+        minSdkVersion 8
+        targetSdkVersion 23
     }
 
     compileOptions {
@@ -42,9 +42,11 @@ android {
         androidTest.java.srcDirs = ['tests/src']
 
     }
-
 }
 
+dependencies {
+    compile 'com.android.support:appcompat-v7:23.1.0'
+}
 
 
 

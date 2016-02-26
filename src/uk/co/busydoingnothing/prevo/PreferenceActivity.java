@@ -17,7 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
+import android.support.v7.app.AppCompatActivity;
 import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;

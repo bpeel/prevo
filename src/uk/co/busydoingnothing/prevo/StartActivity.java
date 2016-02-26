@@ -17,7 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
+import android.support.v7.app.AppCompatActivity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
@@ -26,7 +26,7 @@ import android.os.Bundle;
  * language then we'll default to searching in that language again,
  * otherwise we show the language select page */
 
-public class StartActivity extends Activity
+public class StartActivity extends AppCompatActivity
 {
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -37,7 +37,7 @@ public class StartActivity extends Activity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     lastLanguage = prefs.getString (MenuHelper.PREF_LAST_LANGUAGE, null);
 

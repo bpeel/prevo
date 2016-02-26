@@ -22,11 +22,12 @@
           a:versionCode="13"
           a:versionName="0.13"
           a:installLocation="auto">
-  <uses-sdk a:minSdkVersion="7" a:targetSdkVersion="14" />
+  <uses-sdk a:minSdkVersion="8" a:targetSdkVersion="23" />
 
   <application a:label="@string/app_name"
                a:icon="@drawable/ic_launcher"
-               a:hardwareAccelerated="true">
+               a:hardwareAccelerated="true"
+               a:theme="@style/AppTheme">
     <activity a:name="LanguagesActivity"
               a:label="@string/app_name">
       <intent-filter>

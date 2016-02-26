@@ -17,7 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
+import android.support.v7.app.AppCompatActivity;
 import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;
@@ -87,7 +87,7 @@ public class SelectLanguageActivity extends ListActivity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
     prefs.registerOnSharedPreferenceChangeListener (this);
   }
 
@@ -120,7 +120,7 @@ public class SelectLanguageActivity extends ListActivity
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
