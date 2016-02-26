@@ -42,12 +42,4 @@
   <string name="show_translations">Montritaj tradukoj</string>
   <string name="show_all_translations">Montru ĉiujn tradukojn</string>
   <string name="show_no_translations">Montru neniujn tradukojn</string>
-  <string name="about_message">
-<b>PReVo @VERSION@</b>\n
-\nCopyright © 2012, 2013, 2016 Neil Roberts\n
-\nLa datumo por la vortaro venas de Reta Vortaro.\n
-\nThis program comes with ABSOLUTELY NO WARRANTY. This is free
-software and you are welcome to redistribute it under certain
-conditions. Click here for details.
-  </string>
 </resources>

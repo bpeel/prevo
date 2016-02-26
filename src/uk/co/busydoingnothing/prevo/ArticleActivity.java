@@ -586,7 +586,7 @@ public class ArticleActivity extends Activity
         }
 
       default:
-        return MenuHelper.onCreateDialog (this, id);
+        return null;
       }
   }
 

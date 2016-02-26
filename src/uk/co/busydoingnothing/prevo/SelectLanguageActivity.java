@@ -147,12 +147,6 @@ public class SelectLanguageActivity extends ListActivity
   }
 
   @Override
-  protected Dialog onCreateDialog (int id)
-  {
-    return MenuHelper.onCreateDialog (this, id);
-  }
-
-  @Override
   public void onSharedPreferenceChanged (SharedPreferences prefs,
                                          String key)
   {

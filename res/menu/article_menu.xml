@@ -31,7 +31,4 @@
         a:title="@string/menu_preferences"
         a:icon="@android:drawable/ic_menu_preferences"
         a:showAsAction="never" />
-  <item a:id="@+id/menu_about"
-        a:title="@string/menu_about"
-        a:icon="@android:drawable/ic_menu_info_details" />
 </menu>
