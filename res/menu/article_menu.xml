@@ -21,10 +21,6 @@
       xmlns:app="http://schemas.android.com/apk/res-auto">
   <item a:id="@+id/menu_choose_language"
         a:title="@string/menu_choose_language" />
-  <item a:id="@+id/menu_search"
-        a:title="@string/menu_search"
-        a:icon="@android:drawable/ic_menu_search"
-        app:showAsAction="ifRoom" />
   <item a:id="@+id/menu_zoom"
         a:title="@string/menu_zoom"
         a:icon="@android:drawable/ic_menu_zoom" />

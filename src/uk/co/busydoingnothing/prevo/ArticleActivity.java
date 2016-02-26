@@ -17,6 +17,8 @@
 
 package uk.co.busydoingnothing.prevo;
 
+import android.content.Context;
+import android.support.design.widget.CoordinatorLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.app.AlertDialog;
 import android.app.Dialog;
@@ -81,7 +83,7 @@ public class ArticleActivity extends AppCompatActivity
   private int articleNumber;
 
   private ZoomControls zoomControls;
-  private RelativeLayout layout;
+  private CoordinatorLayout layout;
 
   /* There are 10 font sizes ranging from 0 to 9. The actual font size
    * used is calculated from a logarithmic scale and set in density
@@ -119,7 +121,7 @@ public class ArticleActivity extends AppCompatActivity
     int strLength = in.readShort ();
     byte[] utf8String = new byte[strLength];
 
-    in.readAll (utf8String);
+    in.readAll(utf8String);
 
     SpannableString string =
       new SpannableString (new String (utf8String));
@@ -235,16 +237,15 @@ public class ArticleActivity extends AppCompatActivity
       }
   }
 
-  private LinearLayout loadArticle (int article)
-    throws IOException
-  {
-    AssetManager assetManager = getAssets ();
+  private LinearLayout loadArticle(int article)
+          throws IOException {
+    AssetManager assetManager = getAssets();
     String filename = String.format (Locale.US,
                                      "articles/article-%03xx.bin",
-                                     article >> 4);
+            article >> 4);
     BinaryReader in = new BinaryReader (assetManager.open (filename));
 
-    skipArticles (in, article & 0xf);
+    skipArticles(in, article & 0xf);
 
     int articleLength = in.readInt ();
     long articleStart = in.getPosition ();
@@ -253,6 +254,11 @@ public class ArticleActivity extends AppCompatActivity
 
     LinearLayout layout = new LinearLayout (this);
     layout.setOrientation (LinearLayout.VERTICAL);
+    // Add some space to make sure FAB does hinder readability
+    // TODO: value should be <margin> + <button size> display pixels
+    // <margin> is 16 dp on phones, 24 dp on tablets
+    // <button size> is 56 dp
+    layout.setPadding(0, 0, 0, 2*(16 + 56));
 
     LayoutInflater layoutInflater = getLayoutInflater ();
     TextView tv[] = new TextView[2];
@@ -344,7 +350,7 @@ public class ArticleActivity extends AppCompatActivity
 
         this.fontSize = fontSize;
 
-        updateZoomability ();
+        updateZoomability();
       }
   }
 
@@ -393,7 +399,7 @@ public class ArticleActivity extends AppCompatActivity
     setContentView (R.layout.article);
 
     scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
-    layout = (RelativeLayout) findViewById (R.id.article_layout);
+    layout = (CoordinatorLayout) findViewById (R.id.article_layout);
 
     sectionHeaders = new Vector<TextView> ();
     definitions = new Vector<TextView> ();
@@ -407,13 +413,13 @@ public class ArticleActivity extends AppCompatActivity
 
     setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
 
-    prefs.registerOnSharedPreferenceChangeListener (this);
+    prefs.registerOnSharedPreferenceChangeListener(this);
   }
 
   @Override
   public void onStart ()
   {
-    super.onStart ();
+    super.onStart();
 
     stopped = false;
 
@@ -441,15 +447,15 @@ public class ArticleActivity extends AppCompatActivity
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
-    super.onDestroy ();
+    super.onDestroy();
   }
 
   @Override
   public boolean onCreateOptionsMenu (Menu menu)
   {
-    MenuInflater inflater = getMenuInflater ();
+    MenuInflater inflater = getMenuInflater();
 
-    inflater.inflate (R.menu.article_menu, menu);
+    inflater.inflate(R.menu.article_menu, menu);
 
     return true;
   }
@@ -471,13 +477,13 @@ public class ArticleActivity extends AppCompatActivity
     editor.commit ();
 
     setHideZoom ();
-    updateZoomability ();
+    updateZoomability();
   }
 
   private void setHideZoom ()
   {
-    handler.removeMessages (MSG_HIDE_ZOOM_CONTROLS);
-    handler.sendEmptyMessageDelayed (MSG_HIDE_ZOOM_CONTROLS, 10000);
+    handler.removeMessages(MSG_HIDE_ZOOM_CONTROLS);
+    handler.sendEmptyMessageDelayed(MSG_HIDE_ZOOM_CONTROLS, 10000);
   }
 
   private void showZoomController ()
@@ -613,7 +619,7 @@ public class ArticleActivity extends AppCompatActivity
     if (v instanceof TextView)
       {
         MenuInflater inflater = getMenuInflater ();
-        inflater.inflate (R.menu.definition_menu, menu);
+        inflater.inflate(R.menu.definition_menu, menu);
       }
   }
 
@@ -626,7 +632,7 @@ public class ArticleActivity extends AppCompatActivity
     intent.putExtra (SOURCE_TEXT, sourceText.toString ());
     intent.putExtra (TARGET_TEXT, targetText.toString ());
 
-    intent.setAction (ACTION_CREATE_FLASHCARD);
+    intent.setAction(ACTION_CREATE_FLASHCARD);
 
     try
       {
@@ -689,5 +695,9 @@ public class ArticleActivity extends AppCompatActivity
             loadIntendedArticle ();
           }
       }
+  }
+
+  public void fab_onClick(View view) {
+    MenuHelper.goSearch(this);
   }
 }

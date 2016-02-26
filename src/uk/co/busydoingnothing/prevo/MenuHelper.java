@@ -95,10 +95,6 @@ public class MenuHelper
         goChooseLanguage (context);
         return true;
 
-      case R.id.menu_search:
-        goSearch (context);
-        return true;
-
       case R.id.menu_preferences:
         goPreferences (context);
         return true;

@@ -44,8 +44,13 @@ android {
     }
 }
 
+ext {
+    supportLibVersion = '23.1.0'
+}
+
 dependencies {
-    compile 'com.android.support:appcompat-v7:23.1.0'
+    compile "com.android.support:appcompat-v7:${supportLibVersion}"
+    compile "com.android.support:design:${supportLibVersion}"
 }
 
 
