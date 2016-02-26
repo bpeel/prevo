@@ -1,8 +1,15 @@
+/*.iml
+/.gradle
+/.idea
 /local.properties
 /project.properties
 /bin
+/build
 /libs
 /gen
+/gradle
+/gradlew
+/gradlew.bat
 
 /assets/articles/article-*.bin
 /assets/indices/index-*.bin
