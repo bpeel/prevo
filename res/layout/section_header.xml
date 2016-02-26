@@ -21,4 +21,5 @@
           a:id="@+id/section_header"
           a:layout_width="match_parent"
           a:layout_height="wrap_content"
+          a:paddingTop="16dp"
           style="?android:attr/listSeparatorTextViewStyle" />

@@ -27,13 +27,15 @@
   <uk.co.busydoingnothing.prevo.DelayedScrollView
         a:id="@+id/article_scroll_view"
         a:layout_width="match_parent"
-        a:layout_height="match_parent" />
+        a:layout_height="match_parent"
+        a:paddingLeft="16dp"
+        a:paddingRight="16dp" />
 
   <android.support.design.widget.FloatingActionButton
         a:layout_width="wrap_content"
         a:layout_height="wrap_content"
         a:layout_gravity="bottom|right"
-        a:layout_margin="16dp"
+        a:layout_margin="0dp"
         a:src="@drawable/ic_search_white_24dp"
         app:layout_anchor="@id/article_scroll_view"
         app:layout_anchorGravity="bottom|right|end"
