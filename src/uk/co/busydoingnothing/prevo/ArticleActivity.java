@@ -30,7 +30,6 @@ import android.content.SharedPreferences;
 import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
@@ -45,6 +44,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.KeyEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.LinearLayout;
@@ -82,7 +82,6 @@ public class ArticleActivity extends AppCompatActivity
   private View articleView;
   private int articleNumber;
 
-  private ZoomControls zoomControls;
   private CoordinatorLayout layout;
 
   /* There are 10 font sizes ranging from 0 to 9. The actual font size
@@ -94,8 +93,6 @@ public class ArticleActivity extends AppCompatActivity
   private int fontSize = N_FONT_SIZES / 2;
   private float titleBaseTextSize;
   private float definitionBaseTextSize;
-
-  private static final int MSG_HIDE_ZOOM_CONTROLS = 4;
 
   private Handler handler;
 
@@ -312,15 +309,6 @@ public class ArticleActivity extends AppCompatActivity
     scrollView.delayedScrollTo (sectionHeaders.get (section));
   }
 
-  private void updateZoomability ()
-  {
-    if (zoomControls != null)
-      {
-        zoomControls.setIsZoomInEnabled (fontSize < N_FONT_SIZES - 1);
-        zoomControls.setIsZoomOutEnabled (fontSize > 0);
-      }
-  }
-
   private void setFontSize (int fontSize)
   {
     if (fontSize < 0)
@@ -349,8 +337,6 @@ public class ArticleActivity extends AppCompatActivity
           }
 
         this.fontSize = fontSize;
-
-        updateZoomability();
       }
   }
 
@@ -400,6 +386,18 @@ public class ArticleActivity extends AppCompatActivity
 
     scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
     layout = (CoordinatorLayout) findViewById (R.id.article_layout);
+    scrollView.setScaleGestureDetector(new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+      @Override
+      public void onScaleEnd(ScaleGestureDetector detector) {
+        float scale = detector.getScaleFactor();
+
+        if (scale >= 1.0) {
+          zoom(+1);
+        } else {
+          zoom(-1);
+        }
+      }
+    }));
 
     sectionHeaders = new Vector<TextView> ();
     definitions = new Vector<TextView> ();
@@ -476,73 +474,6 @@ public class ArticleActivity extends AppCompatActivity
     editor.putInt (MenuHelper.PREF_FONT_SIZE, fontSize);
     editor.commit ();
 
-    setHideZoom ();
-    updateZoomability();
-  }
-
-  private void setHideZoom ()
-  {
-    handler.removeMessages(MSG_HIDE_ZOOM_CONTROLS);
-    handler.sendEmptyMessageDelayed(MSG_HIDE_ZOOM_CONTROLS, 10000);
-  }
-
-  private void showZoomController ()
-  {
-    if (zoomControls == null)
-      {
-        final int wrap = RelativeLayout.LayoutParams.WRAP_CONTENT;
-        RelativeLayout.LayoutParams lp =
-          new RelativeLayout.LayoutParams (wrap, wrap);
-        final float scale = getResources ().getDisplayMetrics ().density;
-
-        lp.addRule (RelativeLayout.CENTER_HORIZONTAL);
-        lp.addRule (RelativeLayout.ALIGN_PARENT_BOTTOM);
-        lp.bottomMargin = (int) (10.0f * scale + 0.5f);
-
-        zoomControls = new ZoomControls (this);
-        zoomControls.setVisibility (View.GONE);
-        layout.addView (zoomControls, lp);
-
-        zoomControls.setOnZoomInClickListener (new View.OnClickListener ()
-          {
-            @Override
-            public void onClick (View v)
-            {
-              zoom (+1);
-            }
-          });
-        zoomControls.setOnZoomOutClickListener (new View.OnClickListener ()
-          {
-            @Override
-            public void onClick (View v)
-            {
-              zoom (-1);
-            }
-          });
-
-        handler = new Handler ()
-          {
-            @Override
-            public void handleMessage (Message msg)
-            {
-              switch (msg.what)
-                {
-                case MSG_HIDE_ZOOM_CONTROLS:
-                  if (zoomControls != null)
-                    zoomControls.hide ();
-                  break;
-                }
-            }
-          };
-
-        updateZoomability ();
-      }
-
-    if (zoomControls.getVisibility () != View.VISIBLE)
-      {
-        zoomControls.show ();
-        setHideZoom ();
-      }
   }
 
   @Override
@@ -550,13 +481,6 @@ public class ArticleActivity extends AppCompatActivity
   {
     if (MenuHelper.onOptionsItemSelected (this, item))
       return true;
-
-    switch (item.getItemId ())
-      {
-      case R.id.menu_zoom:
-        showZoomController ();
-        return true;
-      }
 
     return super.onOptionsItemSelected (item);
   }

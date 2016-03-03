@@ -19,9 +19,6 @@
 
 <menu xmlns:a="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
-  <item a:id="@+id/menu_zoom"
-        a:title="@string/menu_zoom"
-        a:icon="@android:drawable/ic_menu_zoom" />
   <item a:id="@+id/menu_preferences"
         a:title="@string/menu_preferences"
         a:icon="@android:drawable/ic_menu_preferences"
