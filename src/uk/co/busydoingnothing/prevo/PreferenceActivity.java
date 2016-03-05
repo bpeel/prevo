@@ -26,6 +26,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.MessageQueue.IdleHandler;
+import android.support.v7.widget.Toolbar;
 import android.text.method.LinkMovementMethod;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
@@ -49,6 +50,10 @@ public class PreferenceActivity extends AppCompatActivity
   {
     super.onCreate (savedInstanceState);
     setContentView (R.layout.preferences);
+
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+    setTitle(R.string.preferences);
 
     listView = (ListView) findViewById(R.id.list);
     adapter = new PreferenceAdapter (this);

@@ -24,6 +24,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -50,6 +51,9 @@ public class SelectLanguageActivity extends AppCompatActivity
     setTitle (R.string.select_language);
     setContentView (R.layout.languages);
 
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+    
     ListView listView = (ListView) findViewById(R.id.list);
     adapter = new LanguagesAdapter (this);
     listView.setAdapter (adapter);

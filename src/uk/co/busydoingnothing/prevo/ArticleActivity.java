@@ -27,6 +27,7 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.content.SharedPreferences;
+import android.support.v7.widget.Toolbar;
 import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
@@ -383,6 +384,8 @@ public class ArticleActivity extends AppCompatActivity
     super.onCreate (savedInstanceState);
 
     setContentView (R.layout.article);
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
 
     scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
     layout = (CoordinatorLayout) findViewById (R.id.article_layout);

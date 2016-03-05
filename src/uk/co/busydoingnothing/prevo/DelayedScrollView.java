@@ -18,6 +18,7 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.content.Context;
+import android.support.v4.widget.NestedScrollView;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -30,7 +31,7 @@ import android.widget.ScrollView;
  * the layout has occured then the views won't have the right
  * position */
 
-public class DelayedScrollView extends ScrollView
+public class DelayedScrollView extends NestedScrollView
 {
   private boolean hadLayout = false;
   private View delayedView = null;

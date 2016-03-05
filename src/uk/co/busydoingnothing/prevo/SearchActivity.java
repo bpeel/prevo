@@ -24,6 +24,7 @@ import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -65,6 +66,9 @@ public class SearchActivity extends AppCompatActivity
   {
     super.onCreate (savedInstanceState);
     setContentView (R.layout.search);
+
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
 
     ensureActionInitialised ();
 

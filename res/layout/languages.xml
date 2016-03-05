@@ -21,6 +21,11 @@
               a:orientation="vertical"
               a:layout_width="match_parent"
               a:layout_height="match_parent">
+  <android.support.v7.widget.Toolbar
+            a:id="@+id/toolbar"
+            a:layout_width="match_parent"
+            a:layout_height="?attr/actionBarSize"
+            a:background="?attr/colorPrimary" />
   <ListView a:id="@+id/list"
             a:layout_width="match_parent"
             a:layout_height="match_parent" />  
