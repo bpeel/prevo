@@ -34,7 +34,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-public class SelectLanguageActivity extends ListActivity
+public class SelectLanguageActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   private LanguageDatabaseHelper dbHelper;
@@ -50,19 +50,18 @@ public class SelectLanguageActivity extends ListActivity
     setTitle (R.string.select_language);
     setContentView (R.layout.languages);
 
+    ListView listView = (ListView) findViewById(R.id.list);
     adapter = new LanguagesAdapter (this);
-    setListAdapter (adapter);
+    listView.setAdapter (adapter);
 
     dbHelper = new LanguageDatabaseHelper (this);
 
     stopped = true;
     reloadQueued = true;
 
-    ListView lv = getListView ();
+    listView.setTextFilterEnabled (true);
 
-    lv.setTextFilterEnabled (true);
-
-    lv.setOnItemClickListener (new AdapterView.OnItemClickListener ()
+    listView.setOnItemClickListener (new AdapterView.OnItemClickListener ()
       {
         public void onItemClick (AdapterView<?> parent,
                                  View view,

@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -38,7 +39,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Vector;
 
-public class SearchActivity extends ListActivity
+public class SearchActivity extends AppCompatActivity
   implements TextWatcher
 {
   public static final String EXTRA_LANGUAGE =
@@ -80,7 +81,7 @@ public class SearchActivity extends ListActivity
 
     searchAdapter = new SearchAdapter (this, searchLanguages);
 
-    ListView lv = getListView ();
+    ListView lv = (ListView) findViewById(R.id.list);
     lv.setAdapter (searchAdapter);
 
     Intent intent = getIntent ();

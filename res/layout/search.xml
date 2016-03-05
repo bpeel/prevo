@@ -28,7 +28,7 @@
             a:hint="@string/type_to_filter"
             a:inputType="text"
             a:singleLine="true" />
-  <ListView a:id="@android:id/list"
+  <ListView a:id="@+id/list"
             a:layout_width="match_parent"
             a:layout_height="match_parent" />  
   <TextView a:id="@android:id/empty"
