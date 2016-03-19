@@ -17,13 +17,14 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
+import android.support.v7.app.AppCompatActivity;
 import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -34,7 +35,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-public class SelectLanguageActivity extends ListActivity
+public class SelectLanguageActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   private LanguageDatabaseHelper dbHelper;
@@ -50,19 +51,21 @@ public class SelectLanguageActivity extends ListActivity
     setTitle (R.string.select_language);
     setContentView (R.layout.languages);
 
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+    
+    ListView listView = (ListView) findViewById(R.id.list);
     adapter = new LanguagesAdapter (this);
-    setListAdapter (adapter);
+    listView.setAdapter (adapter);
 
     dbHelper = new LanguageDatabaseHelper (this);
 
     stopped = true;
     reloadQueued = true;
 
-    ListView lv = getListView ();
+    listView.setTextFilterEnabled (true);
 
-    lv.setTextFilterEnabled (true);
-
-    lv.setOnItemClickListener (new AdapterView.OnItemClickListener ()
+    listView.setOnItemClickListener (new AdapterView.OnItemClickListener ()
       {
         public void onItemClick (AdapterView<?> parent,
                                  View view,
@@ -87,7 +90,7 @@ public class SelectLanguageActivity extends ListActivity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
     prefs.registerOnSharedPreferenceChangeListener (this);
   }
 
@@ -120,7 +123,7 @@ public class SelectLanguageActivity extends ListActivity
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
@@ -144,12 +147,6 @@ public class SelectLanguageActivity extends ListActivity
       return true;
 
     return super.onOptionsItemSelected (item);
-  }
-
-  @Override
-  protected Dialog onCreateDialog (int id)
-  {
-    return MenuHelper.onCreateDialog (this, id);
   }
 
   @Override

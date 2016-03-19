@@ -17,7 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
+import android.support.v7.app.AppCompatActivity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import java.util.Arrays;
@@ -32,7 +32,7 @@ public class SelectedLanguages
   {
     SharedPreferences prefs =
       context.getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                                    Activity.MODE_PRIVATE);
+                                    AppCompatActivity.MODE_PRIVATE);
     String languagesString = prefs.getString (PREF, null);
 
     if (languagesString != null)

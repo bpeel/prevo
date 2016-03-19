@@ -27,13 +27,11 @@
   <string name="type_to_filter">Tajpu ion por serĉi</string>
   <string name="main_languages">Ĉefaj lingvoj</string>
   <string name="all_languages">Ĉiuj lingvoj</string>
-  <string name="menu_choose_language">Elektu lingvon</string>
-  <string name="menu_search">Serĉu</string>
+  <string name="menu_choose_language">Serĉu en alia lingvo</string>
   <string name="menu_about">Pri</string>
   <string name="menu_copy_definition">Kopiu difinon</string>
   <string name="menu_create_flashcard_word">Kreu fulmkarton, difino→vorto</string>
   <string name="menu_create_flashcard_definition">Kreu fulmkarton, vorto→difino</string>
-  <string name="menu_zoom">Zomu la tekston</string>
   <string name="menu_preferences">Agordoj</string>
   <string name="menu_search_language">Serĉu en %s</string>
   <string name="no_flashcard">Mankas aplikaĵo kiu povas krei fulmkarton. Eble vi volos instali “Anki”; almenaŭ version 2.0.</string>
@@ -42,12 +40,4 @@
   <string name="show_translations">Montritaj tradukoj</string>
   <string name="show_all_translations">Montru ĉiujn tradukojn</string>
   <string name="show_no_translations">Montru neniujn tradukojn</string>
-  <string name="about_message">
-<b>PReVo @VERSION@</b>\n
-\nCopyright © 2012, 2013, 2016 Neil Roberts\n
-\nLa datumo por la vortaro venas de Reta Vortaro.\n
-\nThis program comes with ABSOLUTELY NO WARRANTY. This is free
-software and you are welcome to redistribute it under certain
-conditions. Click here for details.
-  </string>
 </resources>

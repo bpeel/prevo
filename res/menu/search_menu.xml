@@ -17,14 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<menu xmlns:a="http://schemas.android.com/apk/res/android">
+<menu xmlns:a="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
   <item a:id="@+id/menu_choose_language"
         a:title="@string/menu_choose_language" />
   <item a:id="@+id/menu_preferences"
         a:title="@string/menu_preferences"
         a:icon="@android:drawable/ic_menu_preferences"
-        a:showAsAction="never" />
-  <item a:id="@+id/menu_about"
-        a:title="@string/menu_about"
-        a:icon="@android:drawable/ic_menu_info_details" />
+        app:showAsAction="never" />
 </menu>

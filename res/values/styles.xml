@@ -18,6 +18,13 @@
 -->
 
 <resources>
+
+  <style name="BaseAppTheme" parent="Theme.AppCompat.NoActionBar">
+  </style>
+
+  <style name="AppTheme" parent="BaseAppTheme">
+  </style>
+
   <style name="search_note" parent="@android:style/TextAppearance.Small">
     <item name="android:gravity">center</item>
   </style>

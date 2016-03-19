@@ -17,18 +17,20 @@
 
 package uk.co.busydoingnothing.prevo;
 
-import android.app.Activity;
-import android.app.AlertDialog;
+import android.content.Context;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.content.SharedPreferences;
+import android.support.v7.widget.Toolbar;
 import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
@@ -43,6 +45,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.KeyEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.LinearLayout;
@@ -53,7 +56,7 @@ import java.io.IOException;
 import java.util.Vector;
 import java.util.Locale;
 
-public class ArticleActivity extends Activity
+public class ArticleActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   public static final String EXTRA_ARTICLE_NUMBER =
@@ -80,8 +83,7 @@ public class ArticleActivity extends Activity
   private View articleView;
   private int articleNumber;
 
-  private ZoomControls zoomControls;
-  private RelativeLayout layout;
+  private CoordinatorLayout layout;
 
   /* There are 10 font sizes ranging from 0 to 9. The actual font size
    * used is calculated from a logarithmic scale and set in density
@@ -92,8 +94,6 @@ public class ArticleActivity extends Activity
   private int fontSize = N_FONT_SIZES / 2;
   private float titleBaseTextSize;
   private float definitionBaseTextSize;
-
-  private static final int MSG_HIDE_ZOOM_CONTROLS = 4;
 
   private Handler handler;
 
@@ -119,7 +119,7 @@ public class ArticleActivity extends Activity
     int strLength = in.readShort ();
     byte[] utf8String = new byte[strLength];
 
-    in.readAll (utf8String);
+    in.readAll(utf8String);
 
     SpannableString string =
       new SpannableString (new String (utf8String));
@@ -235,16 +235,15 @@ public class ArticleActivity extends Activity
       }
   }
 
-  private LinearLayout loadArticle (int article)
-    throws IOException
-  {
-    AssetManager assetManager = getAssets ();
+  private LinearLayout loadArticle(int article)
+          throws IOException {
+    AssetManager assetManager = getAssets();
     String filename = String.format (Locale.US,
                                      "articles/article-%03xx.bin",
-                                     article >> 4);
+            article >> 4);
     BinaryReader in = new BinaryReader (assetManager.open (filename));
 
-    skipArticles (in, article & 0xf);
+    skipArticles(in, article & 0xf);
 
     int articleLength = in.readInt ();
     long articleStart = in.getPosition ();
@@ -253,6 +252,11 @@ public class ArticleActivity extends Activity
 
     LinearLayout layout = new LinearLayout (this);
     layout.setOrientation (LinearLayout.VERTICAL);
+    // Add some space to make sure FAB does hinder readability
+    // TODO: value should be <margin> + <button size> display pixels
+    // <margin> is 16 dp on phones, 24 dp on tablets
+    // <button size> is 56 dp
+    layout.setPadding(0, 0, 0, 2*(16 + 56));
 
     LayoutInflater layoutInflater = getLayoutInflater ();
     TextView tv[] = new TextView[2];
@@ -306,15 +310,6 @@ public class ArticleActivity extends Activity
     scrollView.delayedScrollTo (sectionHeaders.get (section));
   }
 
-  private void updateZoomability ()
-  {
-    if (zoomControls != null)
-      {
-        zoomControls.setIsZoomInEnabled (fontSize < N_FONT_SIZES - 1);
-        zoomControls.setIsZoomOutEnabled (fontSize > 0);
-      }
-  }
-
   private void setFontSize (int fontSize)
   {
     if (fontSize < 0)
@@ -343,8 +338,6 @@ public class ArticleActivity extends Activity
           }
 
         this.fontSize = fontSize;
-
-        updateZoomability ();
       }
   }
 
@@ -391,9 +384,23 @@ public class ArticleActivity extends Activity
     super.onCreate (savedInstanceState);
 
     setContentView (R.layout.article);
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
 
     scrollView = (DelayedScrollView) findViewById (R.id.article_scroll_view);
-    layout = (RelativeLayout) findViewById (R.id.article_layout);
+    layout = (CoordinatorLayout) findViewById (R.id.article_layout);
+    scrollView.setScaleGestureDetector(new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+      @Override
+      public void onScaleEnd(ScaleGestureDetector detector) {
+        float scale = detector.getScaleFactor();
+
+        if (scale >= 1.0) {
+          zoom(+1);
+        } else {
+          zoom(-1);
+        }
+      }
+    }));
 
     sectionHeaders = new Vector<TextView> ();
     definitions = new Vector<TextView> ();
@@ -403,17 +410,17 @@ public class ArticleActivity extends Activity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     setFontSize (prefs.getInt (MenuHelper.PREF_FONT_SIZE, fontSize));
 
-    prefs.registerOnSharedPreferenceChangeListener (this);
+    prefs.registerOnSharedPreferenceChangeListener(this);
   }
 
   @Override
   public void onStart ()
   {
-    super.onStart ();
+    super.onStart();
 
     stopped = false;
 
@@ -437,19 +444,19 @@ public class ArticleActivity extends Activity
   {
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
 
     prefs.unregisterOnSharedPreferenceChangeListener (this);
 
-    super.onDestroy ();
+    super.onDestroy();
   }
 
   @Override
   public boolean onCreateOptionsMenu (Menu menu)
   {
-    MenuInflater inflater = getMenuInflater ();
+    MenuInflater inflater = getMenuInflater();
 
-    inflater.inflate (R.menu.article_menu, menu);
+    inflater.inflate(R.menu.article_menu, menu);
 
     return true;
   }
@@ -465,78 +472,11 @@ public class ArticleActivity extends Activity
 
     SharedPreferences prefs =
       getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
-                            Activity.MODE_PRIVATE);
+                            AppCompatActivity.MODE_PRIVATE);
     SharedPreferences.Editor editor = prefs.edit ();
     editor.putInt (MenuHelper.PREF_FONT_SIZE, fontSize);
     editor.commit ();
 
-    setHideZoom ();
-    updateZoomability ();
-  }
-
-  private void setHideZoom ()
-  {
-    handler.removeMessages (MSG_HIDE_ZOOM_CONTROLS);
-    handler.sendEmptyMessageDelayed (MSG_HIDE_ZOOM_CONTROLS, 10000);
-  }
-
-  private void showZoomController ()
-  {
-    if (zoomControls == null)
-      {
-        final int wrap = RelativeLayout.LayoutParams.WRAP_CONTENT;
-        RelativeLayout.LayoutParams lp =
-          new RelativeLayout.LayoutParams (wrap, wrap);
-        final float scale = getResources ().getDisplayMetrics ().density;
-
-        lp.addRule (RelativeLayout.CENTER_HORIZONTAL);
-        lp.addRule (RelativeLayout.ALIGN_PARENT_BOTTOM);
-        lp.bottomMargin = (int) (10.0f * scale + 0.5f);
-
-        zoomControls = new ZoomControls (this);
-        zoomControls.setVisibility (View.GONE);
-        layout.addView (zoomControls, lp);
-
-        zoomControls.setOnZoomInClickListener (new View.OnClickListener ()
-          {
-            @Override
-            public void onClick (View v)
-            {
-              zoom (+1);
-            }
-          });
-        zoomControls.setOnZoomOutClickListener (new View.OnClickListener ()
-          {
-            @Override
-            public void onClick (View v)
-            {
-              zoom (-1);
-            }
-          });
-
-        handler = new Handler ()
-          {
-            @Override
-            public void handleMessage (Message msg)
-            {
-              switch (msg.what)
-                {
-                case MSG_HIDE_ZOOM_CONTROLS:
-                  if (zoomControls != null)
-                    zoomControls.hide ();
-                  break;
-                }
-            }
-          };
-
-        updateZoomability ();
-      }
-
-    if (zoomControls.getVisibility () != View.VISIBLE)
-      {
-        zoomControls.show ();
-        setHideZoom ();
-      }
   }
 
   @Override
@@ -544,13 +484,6 @@ public class ArticleActivity extends Activity
   {
     if (MenuHelper.onOptionsItemSelected (this, item))
       return true;
-
-    switch (item.getItemId ())
-      {
-      case R.id.menu_zoom:
-        showZoomController ();
-        return true;
-      }
 
     return super.onOptionsItemSelected (item);
   }
@@ -586,7 +519,7 @@ public class ArticleActivity extends Activity
         }
 
       default:
-        return MenuHelper.onCreateDialog (this, id);
+        return null;
       }
   }
 
@@ -613,7 +546,7 @@ public class ArticleActivity extends Activity
     if (v instanceof TextView)
       {
         MenuInflater inflater = getMenuInflater ();
-        inflater.inflate (R.menu.definition_menu, menu);
+        inflater.inflate(R.menu.definition_menu, menu);
       }
   }
 
@@ -626,7 +559,7 @@ public class ArticleActivity extends Activity
     intent.putExtra (SOURCE_TEXT, sourceText.toString ());
     intent.putExtra (TARGET_TEXT, targetText.toString ());
 
-    intent.setAction (ACTION_CREATE_FLASHCARD);
+    intent.setAction(ACTION_CREATE_FLASHCARD);
 
     try
       {
@@ -689,5 +622,9 @@ public class ArticleActivity extends Activity
             loadIntendedArticle ();
           }
       }
+  }
+
+  public void fab_onClick(View view) {
+    MenuHelper.goSearch(this);
   }
 }

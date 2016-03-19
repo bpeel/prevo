@@ -17,12 +17,45 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<RelativeLayout xmlns:a="http://schemas.android.com/apk/res/android"
-                a:layout_width="match_parent"
-                a:layout_height="match_parent"
-                a:id="@+id/article_layout">
+<android.support.design.widget.CoordinatorLayout
+    xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    a:layout_width="match_parent"
+    a:layout_height="match_parent"
+    a:id="@+id/article_layout">
+
+    <android.support.design.widget.AppBarLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:fitsSystemWindows="true">
+
+        <android.support.v7.widget.Toolbar
+            a:id="@+id/toolbar"
+            a:layout_width="match_parent"
+            a:layout_height="?attr/actionBarSize"
+            a:background="?attr/colorPrimary"
+            app:layout_scrollFlags="scroll|enterAlways" />
+
+    </android.support.design.widget.AppBarLayout>
+
   <uk.co.busydoingnothing.prevo.DelayedScrollView
         a:id="@+id/article_scroll_view"
         a:layout_width="match_parent"
-        a:layout_height="match_parent" />
-</RelativeLayout>
+        a:layout_height="match_parent"
+        a:paddingLeft="16dp"
+        a:paddingRight="16dp"
+        a:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"/>
+
+  <android.support.design.widget.FloatingActionButton
+        a:layout_width="wrap_content"
+        a:layout_height="wrap_content"
+        a:layout_gravity="bottom|right"
+        a:layout_marginBottom="16dp"
+        a:layout_marginRight="16dp"
+        a:src="@drawable/ic_search_white_24dp"
+        app:layout_anchor="@id/article_layout"
+        app:layout_anchorGravity="bottom|right|end"
+        a:onClick="fab_onClick"/>
+
+</android.support.design.widget.CoordinatorLayout>

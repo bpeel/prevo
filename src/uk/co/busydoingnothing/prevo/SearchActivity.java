@@ -23,6 +23,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -38,7 +40,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Vector;
 
-public class SearchActivity extends ListActivity
+public class SearchActivity extends AppCompatActivity
   implements TextWatcher
 {
   public static final String EXTRA_LANGUAGE =
@@ -65,6 +67,9 @@ public class SearchActivity extends ListActivity
     super.onCreate (savedInstanceState);
     setContentView (R.layout.search);
 
+    Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+    setSupportActionBar(toolbar);
+
     ensureActionInitialised ();
 
     dbHelper = new LanguageDatabaseHelper (this);
@@ -80,7 +85,7 @@ public class SearchActivity extends ListActivity
 
     searchAdapter = new SearchAdapter (this, searchLanguages);
 
-    ListView lv = getListView ();
+    ListView lv = (ListView) findViewById(R.id.list);
     lv.setAdapter (searchAdapter);
 
     Intent intent = getIntent ();
@@ -247,12 +252,6 @@ public class SearchActivity extends ListActivity
       return true;
 
     return super.onOptionsItemSelected (item);
-  }
-
-  @Override
-  protected Dialog onCreateDialog (int id)
-  {
-    return MenuHelper.onCreateDialog (this, id);
   }
 
   @Override

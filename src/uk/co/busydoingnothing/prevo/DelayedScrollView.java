@@ -18,7 +18,11 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.content.Context;
+import android.support.v4.widget.NestedScrollView;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.widget.ScrollView;
 
@@ -27,10 +31,11 @@ import android.widget.ScrollView;
  * the layout has occured then the views won't have the right
  * position */
 
-public class DelayedScrollView extends ScrollView
+public class DelayedScrollView extends NestedScrollView
 {
   private boolean hadLayout = false;
   private View delayedView = null;
+  private ScaleGestureDetector scaleGestureDetector = null;
 
   public DelayedScrollView (Context context)
   {
@@ -71,5 +76,17 @@ public class DelayedScrollView extends ScrollView
 
     if (delayedView != null)
       delayedScrollTo (delayedView);
+  }
+
+  public void setScaleGestureDetector(ScaleGestureDetector scaleGestureDetector) {
+    this.scaleGestureDetector = scaleGestureDetector;
+  }
+
+  @Override
+  public boolean onTouchEvent(MotionEvent ev) {
+    if (scaleGestureDetector != null) {
+      scaleGestureDetector.onTouchEvent(ev);
+    }
+    return super.onTouchEvent(ev);
   }
 }
