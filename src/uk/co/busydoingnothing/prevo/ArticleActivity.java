@@ -1,6 +1,6 @@
 /*
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012, 2013  Neil Roberts
+ * Copyright (C) 2012, 2013, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
@@ -639,6 +640,41 @@ public class ArticleActivity extends Activity
       }
   }
 
+  private void lookUpInPIV (CharSequence word)
+  {
+    StringBuilder wordBuilder = new StringBuilder ();
+
+    /* Make a copy of the word with only the alphabetic parts
+     * converted to lowercase */
+    for (int i = 0; i < word.length (); i++)
+      {
+        char ch = word.charAt (i);
+
+        /* Stop at the first comma because this usually means there is
+         * more than one word with the same definition and it’s
+         * useless to try and search both words */
+        if (ch == ',')
+          break;
+
+        if (Character.isLetter (ch) || " .-'!’()".indexOf (ch) != -1)
+          wordBuilder.append (Character.toLowerCase (ch));
+      }
+    Uri uri = ((new Uri.Builder ())
+               .scheme ("http")
+               .encodedPath ("//vortaro.net/")
+               .fragment (wordBuilder.toString ())).build ();
+    Intent intent = new Intent (Intent.ACTION_VIEW, uri);
+
+    try
+      {
+        startActivity (intent);
+      }
+    catch (android.content.ActivityNotFoundException e)
+      {
+        Log.w (TAG, "Failed to start activity: " + e.getMessage ());
+      }
+  }
+
   @Override
   public boolean onContextItemSelected (MenuItem item)
   {
@@ -665,6 +701,10 @@ public class ArticleActivity extends Activity
 
           case R.id.menu_create_flashcard_definition:
             createFlashcard (defInfo.word, defInfo.definition);
+            return true;
+
+          case R.id.menu_look_up_in_piv:
+            lookUpInPIV (defInfo.word);
             return true;
           }
       }

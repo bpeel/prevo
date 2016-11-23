@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@
   <string name="menu_copy_definition">Kopiu difinon</string>
   <string name="menu_create_flashcard_word">Kreu fulmkarton, difino→vorto</string>
   <string name="menu_create_flashcard_definition">Kreu fulmkarton, vorto→difino</string>
+  <string name="menu_look_up_in_piv">Serĉu vorton ĉe Vortaro.net</string>
   <string name="menu_zoom">Zomu la tekston</string>
   <string name="menu_preferences">Agordoj</string>
   <string name="menu_search_language">Serĉu en %s</string>

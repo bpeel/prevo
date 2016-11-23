@@ -2,7 +2,7 @@
 
 <!--
  * PReVo - A portable version of ReVo for Android
- * Copyright (C) 2012  Neil Roberts
+ * Copyright (C) 2012, 2016  Neil Roberts
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,4 +24,6 @@
         a:title="@string/menu_create_flashcard_word" />
   <item a:id="@+id/menu_create_flashcard_definition"
         a:title="@string/menu_create_flashcard_definition" />
+  <item a:id="@+id/menu_look_up_in_piv"
+        a:title="@string/menu_look_up_in_piv" />
 </menu>
