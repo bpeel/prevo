@@ -17,6 +17,7 @@
 
 package uk.co.busydoingnothing.prevo;
 
+import android.util.AttributeSet;
 import android.widget.TextView;
 import android.content.Context;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -34,14 +35,34 @@ public class DefinitionView extends TextView
 
   private DefinitionContextMenuInfo contextMenuInfo;
 
+  public DefinitionView (Context context)
+  {
+    super (context);
+  }
+
+  public DefinitionView (Context context, AttributeSet attrs)
+  {
+    super (context, attrs);
+  }
+
+  public DefinitionView (Context context, AttributeSet attrs, int defStyle)
+  {
+    super (context, attrs, defStyle);
+  }
+
   public DefinitionView (Context context,
                          CharSequence word,
                          CharSequence definition)
   {
     super (context);
+    setWord (word, definition);
+  }
 
+  public void setWord (CharSequence word, CharSequence definition)
+  {
     this.word = word;
     this.definition = definition;
+    contextMenuInfo = null;
   }
 
   public ContextMenuInfo getContextMenuInfo ()
