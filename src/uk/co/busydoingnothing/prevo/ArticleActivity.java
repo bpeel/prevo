@@ -276,7 +276,12 @@ public class ArticleActivity extends Activity
             titleBaseTextSize = tv[0].getTextSize ();
             tv[0].setText (header, TextView.BufferType.SPANNABLE);
 
-            tv[1] = new DefinitionView (this, header, content);
+            DefinitionView definitionView =
+              (DefinitionView) layoutInflater.inflate (R.layout.definition,
+                                                       layout,
+                                                       false);
+            definitionView.setWord (header, content);
+            tv[1] = definitionView;
             definitions.add (tv[1]);
             tv[1].setText (content, TextView.BufferType.SPANNABLE);
             registerForContextMenu (tv[1]);
