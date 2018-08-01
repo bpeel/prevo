@@ -1,9 +1,11 @@
-/local.properties
-/project.properties
-/bin
-/libs
-/gen
+*.iml
+.gradle/
+build/
+local.properties
+.idea
+.DS_Store
+.externalNativeBuild
 
-/assets/articles/article-*.bin
-/assets/indices/index-*.bin
-/res/xml/languages.xml
+/app/src/main/assets/articles/article-*.bin
+/app/src/main/assets/indices/index-*.bin
+/app/src/main/res/xml/languages.xml
