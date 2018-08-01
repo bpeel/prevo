@@ -54,14 +54,22 @@ build the application:
 You will likely see some warnings about inconsistencies in the XML
 sources. It is safe to ignore these.
 
-Assuming you have the Android SDK installed correctly, you can now
-build the package like so:
+Assuming you have the Android SDK installed correctly, you can build
+the app either with Android Studio or the command line as follows.
+
+Debug mode:
 
     cd $HOME/prevo
-    android update project -t android-16 -p $PWD
-    ant release
+    ./gradlew assembleDebug
 
-You should then have the final package in `bin/PReVo-release.apk`
+Release mode:
+
+    cd $HOME/prevo
+    ./gradlew assembleRelease
+
+You should then have the final package in either
+`app/build/outputs/apk/debug/` or `app/build/outputs/apk/release/`
+depending on the build type.
 
 Building a specific release
 ---------------------------
