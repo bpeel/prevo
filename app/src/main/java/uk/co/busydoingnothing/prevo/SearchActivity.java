@@ -18,11 +18,11 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Dialog;
-import android.app.ListActivity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -36,7 +36,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import java.util.Vector;
 
-public class SearchActivity extends ListActivity
+public class SearchActivity extends AppCompatActivity
   implements TextWatcher
 {
   public static final String EXTRA_LANGUAGE =
@@ -59,6 +59,9 @@ public class SearchActivity extends ListActivity
     super.onCreate (savedInstanceState);
     setContentView (R.layout.search);
 
+    ListView lv = (ListView) findViewById(R.id.list);
+    lv.setEmptyView(findViewById(R.id.empty));
+
     dbHelper = new LanguageDatabaseHelper (this);
 
     updateSearchLanguages ();
@@ -72,7 +75,6 @@ public class SearchActivity extends ListActivity
 
     searchAdapter = new SearchAdapter (this, searchLanguages);
 
-    ListView lv = getListView ();
     lv.setAdapter (searchAdapter);
 
     Intent intent = getIntent ();

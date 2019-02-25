@@ -18,7 +18,6 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Activity;
-import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -26,6 +25,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.MessageQueue.IdleHandler;
+import android.support.v7.app.AppCompatActivity;
 import android.text.method.LinkMovementMethod;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
@@ -37,11 +37,12 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-public class PreferenceActivity extends ListActivity
+public class PreferenceActivity extends AppCompatActivity
 {
   private SharedPreferences prefs;
   private PreferenceAdapter adapter;
   private boolean queuedUpdate;
+  private ListView listView;
 
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -49,13 +50,13 @@ public class PreferenceActivity extends ListActivity
     super.onCreate (savedInstanceState);
     setContentView (R.layout.preferences);
 
+    listView = (ListView) findViewById (R.id.list);
+
     adapter = new PreferenceAdapter (this);
-    setListAdapter (adapter);
+    listView.setAdapter (adapter);
 
     prefs = getSharedPreferences (MenuHelper.PREVO_PREFERENCES,
                                   MODE_PRIVATE);
-
-    ListView listView = getListView ();
 
     listView.setItemsCanFocus (false);
     listView.setChoiceMode (ListView.CHOICE_MODE_MULTIPLE);
@@ -83,7 +84,6 @@ public class PreferenceActivity extends ListActivity
 
   private void setAll (boolean value)
   {
-    ListView listView = getListView ();
     int numPrefs = adapter.getCount ();
 
     for (int i = PreferenceAdapter.FIRST_LANGUAGE_POSITION; i < numPrefs; i++)
@@ -92,7 +92,6 @@ public class PreferenceActivity extends ListActivity
 
   private void updateCheckedState ()
   {
-    ListView listView = getListView ();
     SelectedLanguages selectedLanguages = new SelectedLanguages (this);
     int numPrefs = adapter.getCount ();
 
@@ -105,7 +104,6 @@ public class PreferenceActivity extends ListActivity
 
   private void updatePreference ()
   {
-    ListView listView = getListView ();
     SparseBooleanArray checkedItems = listView.getCheckedItemPositions ();
     int totalLanguages =
       listView.getCount () - PreferenceAdapter.FIRST_LANGUAGE_POSITION;

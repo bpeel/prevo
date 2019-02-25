@@ -20,13 +20,14 @@ package uk.co.busydoingnothing.prevo;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 
 /* This activity is just like a landing page to select the right
  * initial activity. If the user has already previously selected a
  * language then we'll default to searching in that language again,
  * otherwise we show the language select page */
 
-public class StartActivity extends Activity
+public class StartActivity extends AppCompatActivity
 {
   @Override
   public void onCreate (Bundle savedInstanceState)

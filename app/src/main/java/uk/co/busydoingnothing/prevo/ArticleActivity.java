@@ -18,7 +18,6 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -30,6 +29,8 @@ import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
@@ -54,7 +55,7 @@ import java.io.IOException;
 import java.util.Vector;
 import java.util.Locale;
 
-public class ArticleActivity extends Activity
+public class ArticleActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   public static final String EXTRA_ARTICLE_NUMBER =

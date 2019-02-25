@@ -18,12 +18,12 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.app.Activity;
-import android.app.ListActivity;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -34,7 +34,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
-public class SelectLanguageActivity extends ListActivity
+public class SelectLanguageActivity extends AppCompatActivity
   implements SharedPreferences.OnSharedPreferenceChangeListener
 {
   private LanguageDatabaseHelper dbHelper;
@@ -50,15 +50,15 @@ public class SelectLanguageActivity extends ListActivity
     setTitle (R.string.select_language);
     setContentView (R.layout.languages);
 
+    ListView lv = (ListView) findViewById(R.id.list);
+
     adapter = new LanguagesAdapter (this);
-    setListAdapter (adapter);
+    lv.setAdapter (adapter);
 
     dbHelper = new LanguageDatabaseHelper (this);
 
     stopped = true;
     reloadQueued = true;
-
-    ListView lv = getListView ();
 
     lv.setTextFilterEnabled (true);
 
