@@ -18,103 +18,34 @@
 package uk.co.busydoingnothing.prevo;
 
 import android.util.Log;
+import android.content.ClipData;
 import android.content.Context;
-import android.text.ClipboardManager;
+import android.content.ClipboardManager;
 import android.text.Html;
 import android.text.Spanned;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 
 public abstract class SpannedCopy
 {
-  private static boolean initialised = false;
-
-  private static boolean supported = false;
-
-  private static Class clipDataClass;
-  private static Class clipboardManagerClass;
-  private static Method newPlainTextMethod;
-  private static Method newHtmlTextMethod;
-  private static Method setPrimaryClipMethod;
-
   public static final String TAG = "prevoclip";
-
-  private static void initialise ()
-  {
-    if (!initialised)
-      {
-        try
-          {
-            clipDataClass = Class.forName ("android.content.ClipData");
-            newPlainTextMethod =
-              clipDataClass.getMethod ("newPlainText",
-                                       CharSequence.class,
-                                       CharSequence.class);
-            newHtmlTextMethod =
-              clipDataClass.getMethod ("newHtmlText",
-                                       CharSequence.class,
-                                       CharSequence.class,
-                                       String.class);
-            clipboardManagerClass =
-              Class.forName ("android.content.ClipboardManager");
-            setPrimaryClipMethod =
-              clipboardManagerClass.getMethod ("setPrimaryClip",
-                                               clipDataClass);
-
-            supported = true;
-          }
-        catch (ClassNotFoundException e)
-          {
-            Log.i (TAG, "Clipboard not supported: " + e.getMessage ());
-          }
-        catch (NoSuchMethodException e)
-          {
-            Log.i (TAG, "Clipboard not supported: " + e.getMessage ());
-          }
-
-        initialised = true;
-      }
-  }
 
   public static void copyText (Context context,
                                CharSequence label,
                                CharSequence text)
   {
-    initialise ();
-
     ClipboardManager clipboard =
       (ClipboardManager) context.getSystemService (Context.CLIPBOARD_SERVICE);
 
-    if (supported)
+    ClipData clipData;
+
+    if (text instanceof Spanned)
       {
-        Object clipData;
+        String htmlText = Html.toHtml ((Spanned) text);
 
-        try
-          {
-            if (text instanceof Spanned)
-              {
-                String htmlText = Html.toHtml ((Spanned) text);
-
-                clipData = newHtmlTextMethod.invoke (null, /* receiver */
-                                                     label,
-                                                     text,
-                                                     htmlText);
-              }
-            else
-              clipData = newPlainTextMethod.invoke (null, /* receiver */
-                                                    label,
-                                                    text);
-
-            setPrimaryClipMethod.invoke (clipboard, clipData);
-          }
-        catch (IllegalAccessException e)
-          {
-          }
-        catch (InvocationTargetException e)
-          {
-          }
+        clipData = ClipData.newHtmlText (label, text, htmlText);
       }
     else
-      clipboard.setText (text);
+      clipData = ClipData.newPlainText (label, text);
+
+    clipboard.setPrimaryClip (clipData);
   }
 }
