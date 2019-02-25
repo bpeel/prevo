@@ -34,8 +34,6 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Vector;
 
 public class SearchActivity extends ListActivity
@@ -53,10 +51,6 @@ public class SearchActivity extends ListActivity
   private SearchAdapter searchAdapter;
   private String[] searchLanguages;
 
-  private static boolean actionInitialised;
-  private static boolean actionSupported;
-  private static Method setShowAsActionMethod;
-
   private LanguageDatabaseHelper dbHelper;
 
   @Override
@@ -64,8 +58,6 @@ public class SearchActivity extends ListActivity
   {
     super.onCreate (savedInstanceState);
     setContentView (R.layout.search);
-
-    ensureActionInitialised ();
 
     dbHelper = new LanguageDatabaseHelper (this);
 
@@ -198,22 +190,9 @@ public class SearchActivity extends ListActivity
 
     item.setIntent (MenuHelper.createSearchIntent (this, language));
 
-    if (actionSupported)
-      {
-        try
-          {
-            setShowAsActionMethod.invoke (item,
-                                          MenuItem.SHOW_AS_ACTION_IF_ROOM |
-                                          MenuItem.SHOW_AS_ACTION_WITH_TEXT);
-            item.setTitleCondensed (language);
-          }
-        catch (IllegalAccessException e)
-          {
-          }
-        catch (InvocationTargetException e)
-          {
-          }
-      }
+    item.setShowAsAction (MenuItem.SHOW_AS_ACTION_IF_ROOM |
+                          MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+    item.setTitleCondensed (language);
   }
 
   @Override
@@ -275,25 +254,5 @@ public class SearchActivity extends ListActivity
                              int before,
                              int count)
   {
-  }
-
-  private static void ensureActionInitialised ()
-  {
-    if (actionInitialised)
-      return;
-
-    try
-      {
-        setShowAsActionMethod =
-          MenuItem.class.getMethod ("setShowAsAction", int.class);
-
-        actionSupported = true;
-      }
-    catch (NoSuchMethodException e)
-      {
-        Log.i (TAG, "Action not supported: " + e.getMessage ());
-      }
-
-    actionInitialised = true;
   }
 }
