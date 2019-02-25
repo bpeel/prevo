@@ -49,7 +49,7 @@ Now assuming you have the source for ReVo in `$HOME/revo`, prevodb in
 command to build the database and put it in the right location to
 build the application:
 
-    $HOME/prevodb/src/prevodb -i $HOME/revo -o $HOME/prevo
+    $HOME/prevodb/src/prevodb -i $HOME/revo -o $HOME/prevo/app/src/main
 
 You will likely see some warnings about inconsistencies in the XML
 sources. It is safe to ignore these.
