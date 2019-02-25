@@ -33,7 +33,8 @@
             a:layout_height="match_parent" />  
   <TextView a:id="@+id/empty"
             a:layout_width="match_parent"
-            a:layout_height="match_parent"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="20dp"
             a:gravity="center"
             a:text="@string/no_results"
             a:visibility="gone" />
