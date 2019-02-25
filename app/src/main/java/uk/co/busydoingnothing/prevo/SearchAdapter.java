@@ -26,6 +26,7 @@ import android.widget.BaseAdapter;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.TextView;
+import java.util.Locale;
 
 class SearchResultData
 {
@@ -226,7 +227,7 @@ public class SearchAdapter extends BaseAdapter
     public FilterResults performFiltering (CharSequence filter)
     {
       FilterResults ret = new FilterResults ();
-      String filterString = Hats.removeHats (filter).toLowerCase ();
+      String filterString = Hats.removeHats (filter).toLowerCase (Locale.ROOT);
       SearchResultData resultData = doSearch (filterString);
 
       ret.count = resultData.count;
