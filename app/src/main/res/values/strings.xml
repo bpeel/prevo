@@ -19,34 +19,34 @@
 
 <resources>
   <string name="app_name">PReVo</string>
-  <string name="select_language">Elektu lingvon</string>
-  <string name="search">Serĉu</string>
+  <string name="select_language">Elekti lingvon</string>
+  <string name="search">Serĉi</string>
   <string name="preferences">Agordoj</string>
-  <string name="no_results">Neniuj vortoj troviĝis</string>
-  <string name="other_language_note">Neniuj vortoj troviĝis en %1$s, jen vortoj en %2$s</string>
-  <string name="type_to_filter">Tajpu ion por serĉi</string>
+  <string name="no_results">Neniu vorto troviĝis</string>
+  <string name="other_language_note">Neniu vorto troviĝis en %1$s, jen vortoj en %2$s</string>
+  <string name="type_to_filter">Tajpi ion por serĉi</string>
   <string name="main_languages">Ĉefaj lingvoj</string>
   <string name="all_languages">Ĉiuj lingvoj</string>
-  <string name="menu_choose_language">Elektu lingvon</string>
-  <string name="menu_search">Serĉu</string>
+  <string name="menu_choose_language">Elekti lingvon</string>
+  <string name="menu_search">Serĉi</string>
   <string name="menu_about">Pri</string>
-  <string name="menu_copy_definition">Kopiu difinon</string>
-  <string name="menu_create_flashcard_word">Kreu fulmkarton, difino→vorto</string>
-  <string name="menu_create_flashcard_definition">Kreu fulmkarton, vorto→difino</string>
-  <string name="menu_look_up_in_piv">Serĉu vorton ĉe Vortaro.net</string>
-  <string name="menu_zoom">Zomu la tekston</string>
+  <string name="menu_copy_definition">Kopii difinon</string>
+  <string name="menu_create_flashcard_word">Krei fulmkarton, difino→vorto</string>
+  <string name="menu_create_flashcard_definition">Krei fulmkarton, vorto→difino</string>
+  <string name="menu_look_up_in_piv">Serĉi vorton ĉe Vortaro.net</string>
+  <string name="menu_zoom">Zomi la tekston</string>
   <string name="menu_preferences">Agordoj</string>
-  <string name="menu_search_language">Serĉu en %s</string>
+  <string name="menu_search_language">Serĉi en %s</string>
   <string name="no_flashcard">Mankas aplikaĵo kiu povas krei fulmkarton. Eble vi volos instali “Anki”; almenaŭ version 2.0.</string>
   <string name="definition_label">Difino</string>
-  <string name="close">Fermu</string>
-  <string name="show_translations">Montritaj tradukoj</string>
-  <string name="show_all_translations">Montru ĉiujn tradukojn</string>
-  <string name="show_no_translations">Montru neniujn tradukojn</string>
+  <string name="close">Fermi</string>
+  <string name="show_translations">Montrataj tradukoj</string>
+  <string name="show_all_translations">Montri ĉiujn tradukojn</string>
+  <string name="show_no_translations">Montri neniun tradukon</string>
   <string name="about_message">
 <b>PReVo @VERSION@</b>\n
-\nCopyright © 2012, 2013, 2016, 2017, 2018, 2019 Neil Roberts\n
-\nLa datumo por la vortaro venas de Reta Vortaro.\n
+\nCopyright © 2012, 2013, 2016, 2017, 2018, 2019, 2020 Neil Roberts\n
+\nLa datumoj por la vortaro venas de Reta Vortaro.\n
 \nThis program comes with ABSOLUTELY NO WARRANTY. This is free
 software and you are welcome to redistribute it under certain
 conditions. Click here for details.
