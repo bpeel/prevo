@@ -1,0 +1,1 @@
+PreVo jest przenośną wersją <a href="http://www.reta-vortaro.de/">Reta Vortaro</a> (bezpłatnego i wolnego słownika międzynarodowego języka Esperanto) na system Android. Działa bez połączenia z siecią, pozwala na szybkie wyszukiwanie za pomocą klawiatury. Oprócz definicji w języku Esperanto, baza zawiera tłumaczenia na inne języki (w tym polski).
