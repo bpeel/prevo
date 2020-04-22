@@ -1,0 +1,1 @@
+PReVo estas portebla versio de <a href="http://www.reta-vortaro.de/">Reta Vortaro</a> (la libera interreta esperanta vortaro) por Android. Ĝi estas uzebla sen retkonekto kaj ĝi estas rapide serĉebla per la klavaro. Aldone al difinoj de vortoj en Esperanto, la vortaro ankaŭ liveras tradukojn al diversaj aliaj lingvoj.
