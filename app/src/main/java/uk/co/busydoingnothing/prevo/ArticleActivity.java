@@ -666,9 +666,9 @@ public class ArticleActivity extends AppCompatActivity
           wordBuilder.append (Character.toLowerCase (ch));
       }
     Uri uri = ((new Uri.Builder ())
-               .scheme ("http")
+               .scheme ("https")
                .encodedPath ("//vortaro.net/")
-               .fragment (wordBuilder.toString ())).build ();
+               .fragment (wordBuilder.toString ().trim ())).build ();
     Intent intent = new Intent (Intent.ACTION_VIEW, uri);
 
     try
