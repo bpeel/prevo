@@ -23,18 +23,12 @@ using a program called prevodb, which is available here:
 
  https://github.com/bpeel/prevodb/
 
-The dictionary data is available from the website for the Reta Vortaro
-here:
+The dictionary data is available in these two repos:
 
- http://reta-vortaro.de/tgz/index.html
+ https://github.com/revuloj/revo-fonto  
+ https://github.com/revuloj/voko-grundo
 
-You should download the latest ‘fontodosiero’ which just has the XML
-files without the pictures. You can also download the ‘sanĝitaj
-dosieroj’ and extract that on top of the XML sources to get the latest
-updates. Alternatively you can you use my git clone of the data which
-contains the exact data I use to make releases:
-
- https://github.com/bpeel/revo
+You will need to clone both of them in order to build the database.
 
 You can build prevodb with the usual automake commands:
 
@@ -44,12 +38,14 @@ You can build prevodb with the usual automake commands:
 Note that it will need the developer packages for expat and glib in
 order to build.
 
-Now assuming you have the source for ReVo in `$HOME/revo`, prevodb in
-`$HOME/prevodb` and PReVo in `$HOME/prevo`, you can use the following
-command to build the database and put it in the right location to
-build the application:
+Now assuming you have the source for ReVo in `$HOME/revo-fonto` and
+`$HOME/voko-grundo`, prevodb in `$HOME/prevodb` and PReVo in
+`$HOME/prevo`, you can use the following command to build the database
+and put it in the right location to build the application:
 
-    $HOME/prevodb/src/prevodb -i $HOME/revo -o $HOME/prevo/app/src/main
+    $HOME/prevodb/src/prevodb -i $HOME/revo-fonto \
+                              -i $HOME/voko-grundo \
+                              -o $HOME/prevo/app/src/main
 
 You will likely see some warnings about inconsistencies in the XML
 sources. It is safe to ignore these.
