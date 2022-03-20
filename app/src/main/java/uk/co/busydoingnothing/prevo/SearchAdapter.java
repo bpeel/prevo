@@ -221,14 +221,39 @@ public class SearchAdapter extends BaseAdapter
     return filter;
   }
 
+  private static CharSequence trimCharSequence (CharSequence seq)
+  {
+    int length = seq.length ();
+
+    int start;
+
+    for (start = 0; start < length; start++)
+      {
+        if (!Character.isWhitespace (seq.charAt (start)))
+          break;
+      }
+
+    int end;
+
+    for (end = length; end > start; end--)
+      {
+        if (!Character.isWhitespace (seq.charAt (end - 1)))
+          break;
+      }
+
+    return seq.subSequence (start, end);
+  }
+
   private class SearchFilter extends Filter
   {
     @Override
     public FilterResults performFiltering (CharSequence filter)
     {
       FilterResults ret = new FilterResults ();
-      String filterString = Hats.removeHats (filter).toLowerCase (Locale.ROOT);
-      SearchResultData resultData = doSearch (filterString);
+      CharSequence trimmedFilter = trimCharSequence (filter);
+      String hatlessFilter = Hats.removeHats (trimmedFilter);
+      String lowercaseFilter = hatlessFilter.toLowerCase (Locale.ROOT);
+      SearchResultData resultData = doSearch (lowercaseFilter);
 
       ret.count = resultData.count;
       ret.values = resultData;
