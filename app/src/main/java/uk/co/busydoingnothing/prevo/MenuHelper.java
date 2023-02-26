@@ -44,6 +44,8 @@ public class MenuHelper
     "http://www.gnu.org/licenses/gpl-2.0-standalone.html";
   private static final String RETA_VORTARO_URL =
     "http://purl.org/net/voko/revo/";
+  private static final String PRIVACY_POLICY_URL =
+    "http://busydoingnothing.co.uk/prevo/privacy-policy.html";
   public static final String PREVO_PREFERENCES =
     "PrevoPreferences";
   public static final String PREF_LAST_LANGUAGE =
@@ -88,6 +90,12 @@ public class MenuHelper
       {
         URLSpan span = new URLSpan (RETA_VORTARO_URL);
         string.setSpan (span, pos, pos + 12, 0 /* flags */);
+      }
+
+    if ((pos = string.toString ().indexOf ("Politiko de privateco")) != -1)
+      {
+        URLSpan span = new URLSpan (PRIVACY_POLICY_URL);
+        string.setSpan (span, pos, pos + 21, 0 /* flags */);
       }
   }
 
