@@ -14,6 +14,10 @@ It is also available in the Google play store here:
 
  https://play.google.com/store/apps/details?id=uk.co.busydoingnothing.prevo
 
+or with F-Droid here:
+
+ https://f-droid.org/en/packages/uk.co.busydoingnothing.prevo/
+
 Building
 --------
 
