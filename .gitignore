@@ -5,6 +5,7 @@ local.properties
 .idea
 .DS_Store
 .externalNativeBuild
+/prevodb-build
 
 /app/src/main/assets/articles/article-*.bin
 /app/src/main/assets/indices/index-*.bin
