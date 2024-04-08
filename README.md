@@ -22,37 +22,18 @@ Building
 --------
 
 This git repo does not include the assets containing the dictionary
-data. These must be separately built from the dictionary's XML data
-using a program called prevodb, which is available here:
+data. Instead they are built from the ReVo data and the prevodb
+program which are in git submodules. In order to get these modules, be
+sure to run the following git command:
 
- https://github.com/bpeel/prevodb/
+```bash
+git submodule update --init
+```
 
-The dictionary data is available in these two repos:
-
- https://github.com/revuloj/revo-fonto  
- https://github.com/revuloj/voko-grundo
-
-You will need to clone both of them in order to build the database.
-
-You can build prevodb with the usual automake commands:
-
-    ./autogen.sh
-    make -j4
-
-Note that it will need the developer packages for expat and glib in
-order to build.
-
-Now assuming you have the source for ReVo in `$HOME/revo-fonto` and
-`$HOME/voko-grundo`, prevodb in `$HOME/prevodb` and PReVo in
-`$HOME/prevo`, you can use the following command to build the database
-and put it in the right location to build the application:
-
-    $HOME/prevodb/src/prevodb -i $HOME/revo-fonto \
-                              -i $HOME/voko-grundo \
-                              -o $HOME/prevo/app/src/main
-
-You will likely see some warnings about inconsistencies in the XML
-sources. It is safe to ignore these.
+The prevodb program will be built as part of the app build in order to
+generate the dictionary data, so you need to make sure you have a
+compiler for the host machine installed. It will also need the
+developer packages for expat and glib.
 
 Assuming you have the Android SDK installed correctly, you can build
 the app either with Android Studio or the command line as follows.
@@ -79,9 +60,11 @@ following public key:
 
  http://www.busydoingnothing.co.uk/neilroberts.asc
 
-The message for each tag contains the git hashes used for the ReVo
-sources and the prevodb program. This information can be used to build
-a copy of a release using exactly the same data. You can see this
-information for example with:
+The git submodules were added in version 0.25 so the signed tag
+contains the commit hash of the dependencies used as well. For older
+versions, the message for each tag contains the git hashes used for
+the ReVo sources and the prevodb program. This information can be used
+to build a copy of a release using exactly the same data. You can see
+this information for example with:
 
     git show 0.12
