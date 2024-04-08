@@ -1,0 +1,9 @@
+[submodule "extern/voko-grundo"]
+	path = extern/voko-grundo
+	url = https://github.com/revuloj/voko-grundo.git
+[submodule "extern/revo-fonto"]
+	path = extern/revo-fonto
+	url = https://github.com/revuloj/revo-fonto.git
+[submodule "extern/prevodb"]
+	path = extern/prevodb
+	url = https://github.com/bpeel/prevodb
