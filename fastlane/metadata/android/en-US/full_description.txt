@@ -1,0 +1,1 @@
+PReVo is a portable version of Reta Vortaro (the free and libre Esperanto dictionary) for Android. It’s usable without Internet access and is quickly searched with the keyboard.
