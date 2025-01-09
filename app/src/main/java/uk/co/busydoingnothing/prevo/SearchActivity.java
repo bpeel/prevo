@@ -32,6 +32,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import java.util.Vector;
@@ -52,6 +53,8 @@ public class SearchActivity extends AppCompatActivity
   private String[] searchLanguages;
 
   private LanguageDatabaseHelper dbHelper;
+
+  private boolean clearButtonVisible = false;
 
   @Override
   public void onCreate (Bundle savedInstanceState)
@@ -105,6 +108,8 @@ public class SearchActivity extends AppCompatActivity
           startActivity (intent);
         }
       });
+
+    setUpClearSearchButton ();
   }
 
   private void useLanguage ()
@@ -160,22 +165,27 @@ public class SearchActivity extends AppCompatActivity
     searchLanguages = searchLanguagesVector.toArray (searchLanguages);
   }
 
+  private void setUpClearSearchButton ()
+  {
+    View clearButton = findViewById (R.id.clear_search_button);
+
+    clearButton.setOnClickListener (new View.OnClickListener ()
+      {
+        public void onClick (View v)
+        {
+          EditText et = findViewById (R.id.search_edit);
+          et.setText ("");
+          focusSearchEdit ();
+        }
+      });
+  }
+
   @Override
   public void onStart ()
   {
     super.onStart ();
 
-    View tv = findViewById (R.id.search_edit);
-
-    tv.requestFocus ();
-
-    InputMethodManager imm =
-      (InputMethodManager) getSystemService (INPUT_METHOD_SERVICE);
-
-    if (imm != null)
-      imm.showSoftInput (tv,
-                         0, /* flags */
-                         null /* resultReceiver */);
+    focusSearchEdit ();
   }
 
   private void addLanguageMenuItem (Menu menu,
@@ -240,6 +250,19 @@ public class SearchActivity extends AppCompatActivity
   public void afterTextChanged (Editable s)
   {
     searchAdapter.getFilter ().filter (s);
+
+    boolean clearButtonShouldBeVisible = s.length () != 0;
+
+    if (clearButtonVisible != clearButtonShouldBeVisible)
+      {
+        clearButtonVisible = clearButtonShouldBeVisible;
+
+        View clearButton = findViewById (R.id.clear_search_button);
+
+        clearButton.setVisibility (clearButtonVisible
+                                   ? View.VISIBLE
+                                   : View.GONE);
+      }
   }
 
   @Override
@@ -256,5 +279,20 @@ public class SearchActivity extends AppCompatActivity
                              int before,
                              int count)
   {
+  }
+
+  private void focusSearchEdit ()
+  {
+    View tv = findViewById (R.id.search_edit);
+
+    tv.requestFocus ();
+
+    InputMethodManager imm =
+      (InputMethodManager) getSystemService (INPUT_METHOD_SERVICE);
+
+    if (imm != null)
+      imm.showSoftInput (tv,
+                         0, /* flags */
+                         null /* resultReceiver */);
   }
 }

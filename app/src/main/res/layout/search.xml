@@ -17,25 +17,43 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
-              a:orientation="vertical"
-              a:layout_width="match_parent"
-              a:layout_height="match_parent">
+<RelativeLayout xmlns:a="http://schemas.android.com/apk/res/android"
+                a:layout_width="match_parent"
+                a:layout_height="match_parent">
   <EditText a:id="@+id/search_edit"
             a:layout_width="match_parent"
             a:layout_height="wrap_content"
             a:gravity="center"
             a:hint="@string/type_to_filter"
             a:inputType="text"
-            a:singleLine="true" />
+            a:singleLine="true"
+            a:layout_alignParentTop="true"
+            a:layout_toLeftOf="@id/clear_search_button" />
+  <Button a:id="@+id/clear_search_button"
+          a:layout_width="20sp"
+          a:layout_height="20sp"
+          a:layout_marginTop="10sp"
+          a:layout_marginLeft="9dip"
+          a:layout_marginRight="9dip"
+          a:layout_alignParentTop="true"
+          a:layout_alignParentRight="true"
+          a:background="@drawable/clear_button"
+          a:visibility="gone" />
   <ListView a:id="@+id/list"
             a:layout_width="match_parent"
-            a:layout_height="match_parent" />  
+            a:layout_height="match_parent"
+            a:layout_below="@id/search_edit"
+            a:layout_alignParentLeft="true"
+            a:layout_alignParentRight="true"
+            a:layout_alignParentBottom="true" />
   <TextView a:id="@+id/empty"
             a:layout_width="match_parent"
             a:layout_height="wrap_content"
+            a:layout_below="@id/search_edit"
+            a:layout_alignParentLeft="true"
+            a:layout_alignParentRight="true"
             a:layout_marginTop="20dp"
             a:gravity="center"
             a:text="@string/no_results"
             a:visibility="gone" />
-</LinearLayout>
+</RelativeLayout>
