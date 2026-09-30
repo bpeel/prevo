@@ -189,21 +189,27 @@ public class MenuHelper
   public static boolean onOptionsItemSelected (Activity activity,
                                                MenuItem item)
   {
-    switch (item.getItemId ())
+    /* Resource IDs aren't constants any more, so they can't be used
+     * in a switch statement */
+    int itemId = item.getItemId ();
+
+    if (itemId == R.id.menu_choose_language)
       {
-      case R.id.menu_choose_language:
         goChooseLanguage (activity);
         return true;
-
-      case R.id.menu_search:
+      }
+    else if (itemId == R.id.menu_search)
+      {
         goSearch (activity);
         return true;
-
-      case R.id.menu_preferences:
+      }
+    else if (itemId == R.id.menu_preferences)
+      {
         goPreferences (activity);
         return true;
-
-      case R.id.menu_about:
+      }
+    else if (itemId == R.id.menu_about)
+      {
         showAbout (activity);
         return true;
       }

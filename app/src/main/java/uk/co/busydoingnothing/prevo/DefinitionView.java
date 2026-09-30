@@ -21,7 +21,7 @@ import android.util.AttributeSet;
 import android.widget.TextView;
 import android.content.Context;
 import android.view.ContextMenu.ContextMenuInfo;
-import android.support.v7.widget.AppCompatTextView;
+import androidx.appcompat.widget.AppCompatTextView;
 
 public class DefinitionView extends AppCompatTextView
 {

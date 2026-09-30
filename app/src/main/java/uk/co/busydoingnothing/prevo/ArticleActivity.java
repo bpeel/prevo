@@ -29,8 +29,8 @@ import android.view.ContextMenu;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
@@ -552,9 +552,8 @@ public class ArticleActivity extends AppCompatActivity
     if (MenuHelper.onOptionsItemSelected (this, item))
       return true;
 
-    switch (item.getItemId ())
+    if (item.getItemId () == R.id.menu_zoom)
       {
-      case R.id.menu_zoom:
         showZoomController ();
         return true;
       }
@@ -691,25 +690,29 @@ public class ArticleActivity extends AppCompatActivity
         DefinitionView.DefinitionContextMenuInfo defInfo =
           (DefinitionView.DefinitionContextMenuInfo) info;
 
-        switch (item.getItemId())
+        int itemId = item.getItemId ();
+
+        if (itemId == R.id.menu_copy_definition)
           {
-          case R.id.menu_copy_definition:
             CharSequence label =
               getResources ().getText (R.string.definition_label);
 
             SpannedCopy.copyText (this, label, defInfo.definition);
 
             return true;
-
-          case R.id.menu_create_flashcard_word:
+          }
+        else if (itemId == R.id.menu_create_flashcard_word)
+          {
             createFlashcard (defInfo.definition, defInfo.word);
             return true;
-
-          case R.id.menu_create_flashcard_definition:
+          }
+        else if (itemId == R.id.menu_create_flashcard_definition)
+          {
             createFlashcard (defInfo.word, defInfo.definition);
             return true;
-
-          case R.id.menu_look_up_in_piv:
+          }
+        else if (itemId == R.id.menu_look_up_in_piv)
+          {
             lookUpInPIV (defInfo.word);
             return true;
           }
